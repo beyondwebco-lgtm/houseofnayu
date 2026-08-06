@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/images/logo_icon_sharp.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HOUSE OF NAYU — Admin Control Center</title>
+    <link rel="stylesheet" href="/src/style.css" />
+    <style>
+      .admin-layout {
+        padding: 110px 4% 60px 4%;
+        max-width: 1300px;
+        margin: 0 auto;
+      }
+      .admin-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid var(--border-gold);
+      }
+      .admin-title {
+        font-family: var(--font-serif);
+        font-size: 2rem;
+        color: var(--gold-light);
+      }
+      .admin-card {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-md);
+        padding: 24px;
+        margin-bottom: 30px;
+      }
+      .admin-card-title {
+        font-size: 1.2rem;
+        color: var(--gold-light);
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .form-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+      .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .form-group.full-width {
+        grid-column: 1 / -1;
+      }
+      .form-group label {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        letter-spacing: 0.05em;
+      }
+      .form-control {
+        background: var(--bg-card);
+        border: 1px solid var(--border-gold);
+        color: var(--text-main);
+        padding: 10px 14px;
+        border-radius: 6px;
+        outline: none;
+        font-family: var(--font-sans);
+        font-size: 0.9rem;
+      }
+      .form-control:focus {
+        border-color: var(--gold-primary);
+        box-shadow: 0 0 10px rgba(212, 175, 55, 0.2);
+      }
+      .btn-gold {
+        background: var(--gold-gradient);
+        color: #000;
+        font-weight: 700;
+        padding: 12px 24px;
+        border: none;
+        border-radius: 30px;
+        cursor: pointer;
+        transition: var(--transition);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .btn-gold:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-gold);
+      }
+      .table-responsive {
+        overflow-x: auto;
+      }
+      .admin-table {
+        width: 100%;
+        border-collapse: collapse;
+        text-align: left;
+        font-size: 0.9rem;
+      }
+      .admin-table th, .admin-table td {
+        padding: 14px 18px;
+        border-bottom: 1px solid var(--border-subtle);
+      }
+      .admin-table th {
+        color: var(--gold-light);
+        font-weight: 600;
+        background: rgba(212, 175, 55, 0.05);
+      }
+      .admin-table tbody tr:hover {
+        background: rgba(255, 255, 255, 0.02);
+      }
+      .status-pill {
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+      }
+      .status-published {
+        background: rgba(46, 204, 113, 0.15);
+        color: #2ecc71;
+        border: 1px solid rgba(46, 204, 113, 0.3);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Admin Top Navigation -->
+    <nav class="navbar">
+      <div class="brand-left">
+        <a href="/" style="display:flex; align-items:center; text-decoration:none; gap:10px;">
+          <img src="/images/logo_icon_sharp.png" alt="House of Nayu Emblem" class="logo-icon-left" />
+          <span style="color:var(--gold-light); font-size:0.85rem; font-weight:700; letter-spacing:0.1em;">RETURN TO STORE</span>
+        </a>
+      </div>
+      
+      <div class="brand-center">
+        <img src="/images/brand_title_sharp.png" alt="House of Nayu Crest" class="brand-center-img" />
+      </div>
+
+      <div class="nav-actions">
+        <span class="status-pill status-published">● SUPABASE LIVE</span>
+      </div>
+    </nav>
+
+    <!-- Admin Content Area -->
+    <div class="admin-layout">
+      <div class="admin-header">
+        <div>
+          <h1 class="admin-title">Catalog Inventory Management</h1>
+          <p style="color:var(--text-muted); font-size:0.9rem; margin-top:4px;">Manage Saree collections, prices, fabric specs, and Cloudflare R2 media URLs.</p>
+        </div>
+        <button class="btn-gold" id="refresh-db-btn">
+          <i data-lucide="refresh-cw"></i> Sync Supabase DB
+        </button>
+      </div>
+
+      <!-- Add New Saree Form -->
+      <div class="admin-card">
+        <h2 class="admin-card-title"><i data-lucide="plus-circle"></i> Add New Bespoke Saree</h2>
+        <form id="add-saree-form">
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="saree-title">Saree Title *</label>
+              <input type="text" id="saree-title" class="form-control" placeholder="e.g. Royal Kanjivaram Mulberry Silk Saree" required />
+            </div>
+
+            <div class="form-group">
+              <label for="saree-category">Category *</label>
+              <select id="saree-category" class="form-control" required>
+                <option value="Cotton Sarees">Cotton Sarees</option>
+                <option value="Silk Sarees">Silk Sarees</option>
+                <option value="Chiffon Sarees">Chiffon Sarees</option>
+                <option value="Kota Sarees">Kota Sarees</option>
+                <option value="Sico Sarees">Sico Sarees</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="saree-price">Sale Price (₹) *</label>
+              <input type="number" id="saree-price" class="form-control" placeholder="8999" required />
+            </div>
+
+            <div class="form-group">
+              <label for="saree-orig-price">Original MRP Price (₹)</label>
+              <input type="number" id="saree-orig-price" class="form-control" placeholder="12499" />
+            </div>
+
+            <div class="form-group">
+              <label for="saree-fabric">Fabric Material *</label>
+              <input type="text" id="saree-fabric" class="form-control" placeholder="100% Pure Mulberry Silk" required />
+            </div>
+
+            <div class="form-group">
+              <label for="saree-craft">Weaving Craft *</label>
+              <input type="text" id="saree-craft" class="form-control" placeholder="Antique Gold Zari Brocade" required />
+            </div>
+
+            <div class="form-group full-width">
+              <label for="saree-image-url">Image URL (Cloudflare R2 / Asset path) *</label>
+              <input type="text" id="saree-image-url" class="form-control" placeholder="https://cdn.houseofnayu.com/products/silk-001/full.jpg" required />
+            </div>
+
+            <div class="form-group full-width">
+              <label for="saree-description">Craft Description</label>
+              <textarea id="saree-description" class="form-control" rows="3" placeholder="Handcrafted with delicate antique gold zari woven borders..."></textarea>
+            </div>
+          </div>
+
+          <div style="margin-top: 20px; text-align: right;">
+            <button type="submit" class="btn-gold">
+              <i data-lucide="save"></i> Publish Saree to Supabase
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Live Inventory Table -->
+      <div class="admin-card">
+        <h2 class="admin-card-title"><i data-lucide="package"></i> Active Catalog Products</h2>
+        <div class="table-responsive">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Image</th>
+                <th>Title</th>
+                <th>Category</th>
+                <th>Price</th>
+                <th>Fabric</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="admin-inventory-tbody">
+              <tr>
+                <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                  Loading Supabase live records...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/admin.ts"></script>
+  </body>
+</html>
