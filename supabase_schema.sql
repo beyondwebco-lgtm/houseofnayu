@@ -1,50 +1,48 @@
--- House of Nayu Production Schema
+-- House of Nayu Updated Schema for Categories, Dynamic Color Palette, & R2 Media Links
 
--- 1. Categories Table
+-- 1. Categories Table (Dynamic Category Management)
 CREATE TABLE IF NOT EXISTS public.categories (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL UNIQUE,
   slug TEXT NOT NULL UNIQUE,
+  color_code TEXT DEFAULT '#d4af37',
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 2. Products Table
+-- Seed Default 5 Categories
+INSERT INTO public.categories (name, slug) VALUES
+  ('Cotton Sarees', 'cotton-sarees'),
+  ('Silk Sarees', 'silk-sarees'),
+  ('Chiffon Sarees', 'chiffon-sarees'),
+  ('Kota Sarees', 'kota-sarees'),
+  ('Sico Sarees', 'sico-sarees')
+ON CONFLICT (name) DO NOTHING;
+
+-- 2. Products Table (Includes Color Swatch & Category Link)
 CREATE TABLE IF NOT EXISTS public.products (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title TEXT NOT NULL,
   slug TEXT NOT NULL UNIQUE,
-  category_id UUID REFERENCES public.categories(id) ON DELETE RESTRICT,
+  category_name TEXT NOT NULL,
   price NUMERIC(10, 2) NOT NULL,
   original_price NUMERIC(10, 2),
-  description TEXT,
+  color_name TEXT DEFAULT 'Gold',
+  color_hex TEXT DEFAULT '#D4AF37',
   fabric TEXT,
   craft TEXT,
-  blouse_included BOOLEAN DEFAULT true,
+  description TEXT,
+  image_url TEXT NOT NULL,
   available_sizes TEXT[] DEFAULT ARRAY['XS', 'S', 'M', 'L', 'XL'],
-  stock_quantity INT DEFAULT 10,
-  is_featured BOOLEAN DEFAULT false,
   is_published BOOLEAN DEFAULT true,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
-
--- 3. Product Media Table (Cloudflare R2 CDN Links)
-CREATE TABLE IF NOT EXISTS public.product_media (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  product_id UUID REFERENCES public.products(id) ON DELETE CASCADE,
-  r2_key TEXT NOT NULL,
-  cdn_url TEXT NOT NULL,
-  media_type TEXT NOT NULL CHECK (media_type IN ('full', 'detail', 'blouse', 'gallery')),
-  display_order INT DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- Enable Row Level Security (RLS)
+-- Row Level Security (RLS)
 ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.product_media ENABLE ROW LEVEL SECURITY;
 
--- Allow Public Read Access for Storefront
-CREATE POLICY "Public Read Categories" ON public.categories FOR SELECT USING (true);
-CREATE POLICY "Public Read Products" ON public.products FOR SELECT USING (is_published = true);
-CREATE POLICY "Public Read Media" ON public.product_media FOR SELECT USING (true);
+CREATE POLICY "Allow Public Read Categories" ON public.categories FOR SELECT USING (true);
+CREATE POLICY "Allow Public Insert Categories" ON public.categories FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow Public Read Products" ON public.products FOR SELECT USING (true);
+CREATE POLICY "Allow Public Insert Products" ON public.products FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow Public Delete Products" ON public.products FOR DELETE USING (true);

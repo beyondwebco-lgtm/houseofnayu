@@ -21,14 +21,23 @@ export default function StorefrontPage() {
   const [toastMessage, setToastMessage] = useState<string>('');
   const [dbProducts, setDbProducts] = useState<Product[]>(PRODUCTS_DATA);
 
+  const [categoriesList, setCategoriesList] = useState<string[]>(['ALL', 'Cotton Sarees', 'Silk Sarees', 'Chiffon Sarees', 'Kota Sarees', 'Sico Sarees']);
+
   useEffect(() => {
-    async function fetchProducts() {
+    async function fetchStoreData() {
+      // Fetch dynamic categories
+      const { data: catData } = await supabase.from('categories').select('name').order('name');
+      if (catData && catData.length > 0) {
+        setCategoriesList(['ALL', ...catData.map((c: any) => c.name)]);
+      }
+
+      // Fetch dynamic products
       const { data, error } = await supabase.from('products').select('*');
       if (!error && data && data.length > 0) {
         const mapped: Product[] = data.map((item: any) => ({
           id: item.id,
           name: item.title,
-          category: item.category_id || 'Cotton Sarees',
+          category: item.category_name || 'Cotton Sarees',
           price: item.price,
           originalPrice: item.original_price || item.price * 1.3,
           description: item.description || '',
@@ -45,7 +54,7 @@ export default function StorefrontPage() {
         setDbProducts(mapped);
       }
     }
-    fetchProducts();
+    fetchStoreData();
   }, []);
 
   const filteredProducts = dbProducts.filter(p => {
@@ -183,7 +192,7 @@ export default function StorefrontPage() {
               </div>
               <div className="accordion-body">
                 <ul className="category-checkbox-list">
-                  {['ALL', 'Cotton Sarees', 'Silk Sarees', 'Chiffon Sarees', 'Kota Sarees', 'Sico Sarees'].map(cat => (
+                  {categoriesList.map(cat => (
                     <li key={cat} className={`filter-checkbox-item ${currentCategory === cat ? 'active' : ''}`} onClick={() => setCurrentCategory(cat)}>
                       <span className={`custom-checkbox ${currentCategory === cat ? 'checked' : ''}`}></span>
                       <span className="checkbox-label">{cat === 'ALL' ? 'All Collections' : cat}</span>
