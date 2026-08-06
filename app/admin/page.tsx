@@ -104,24 +104,59 @@ export default function AdminPage() {
     setNewCatName('');
   };
 
-  // Image Upload to Cloudflare R2 Helper
-  const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const [uploadedCdnUrls, setUploadedCdnUrls] = useState<string[]>([]);
+  const [uploadingImage, setUploadingImage] = useState<boolean>(false);
 
+  // Handle Multi-Photo Direct Upload to Cloudflare R2
+  const handleMultiImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = Array.from(e.target.files || []);
+    if (selectedFiles.length === 0) return;
+
+    setUploadingImage(true);
     try {
+      // 1. Get Presigned Upload URLs from Next.js R2 Route
+      const fileMeta = selectedFiles.map(f => ({ fileName: f.name, fileType: f.type }));
       const res = await fetch('/api/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileName: file.name }),
+        body: JSON.stringify({ files: fileMeta }),
       });
-      const data = await res.json();
-      if (data.cdnUrl) {
-        setForm(prev => ({ ...prev, imageUrl: data.cdnUrl }));
-        alert('✨ Saree image linked to Cloudflare R2 Storage CDN URL successfully!');
+
+      const { files: r2Targets, error } = await res.json();
+
+      if (error || !r2Targets) {
+        // Fallback for local preview if R2 credentials not configured yet
+        const localUrls = selectedFiles.map(f => URL.createObjectURL(f));
+        setUploadedCdnUrls(prev => [...prev, ...localUrls]);
+        setForm(prev => ({ ...prev, imageUrl: localUrls[0] || '' }));
+        alert('📷 Photos selected! (Running with local image previews until R2 keys are added to .env.local)');
+        return;
       }
+
+      // 2. Upload Binary Files Directly from Browser to Cloudflare R2 Bucket
+      const cdnResults: string[] = [];
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const file = selectedFiles[i];
+        const target = r2Targets[i];
+
+        if (target?.presignedUrl) {
+          await fetch(target.presignedUrl, {
+            method: 'PUT',
+            headers: { 'Content-Type': file.type },
+            body: file,
+          });
+          cdnResults.push(target.cdnUrl);
+        }
+      }
+
+      const finalUrls = cdnResults.length > 0 ? cdnResults : selectedFiles.map(f => URL.createObjectURL(f));
+      setUploadedCdnUrls(prev => [...prev, ...finalUrls]);
+      setForm(prev => ({ ...prev, imageUrl: finalUrls[0] || '' }));
+      alert(`✨ Successfully uploaded ${finalUrls.length} photos directly to Cloudflare R2 Storage!`);
     } catch (err) {
-      console.error('Upload Error:', err);
+      console.error('R2 Multi Upload Error:', err);
+    } finally {
+      setUploadingImage(false);
     }
   };
 
@@ -274,15 +309,35 @@ export default function AdminPage() {
                 <input type="text" value={form.craft} onChange={e => setForm({ ...form, craft: e.target.value })} required style={{ width: '100%', background: 'var(--bg-card)', border: '1px solid var(--border-gold)', color: 'var(--text-main)', padding: '10px', borderRadius: '6px' }} placeholder="Traditional Kanjivaram Zari Brocade" />
               </div>
 
-              {/* Cloudflare R2 Upload Field */}
-              <div>
-                <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <UploadCloud size={14} /> Cloudflare R2 Media Image Link *
+              {/* Multi-Photo Cloudflare R2 Upload Field */}
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={{ fontSize: '0.85rem', color: 'var(--gold-light)', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}>
+                  <UploadCloud size={16} /> Direct Multi-Photo Cloudflare R2 Upload (Select Multiple Saree Photos) *
                 </label>
-                <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-                  <input type="file" onChange={handleImageFileChange} accept="image/*" style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }} />
+                <div style={{ border: '2px dashed var(--border-gold)', borderRadius: '8px', padding: '20px', textAlign: 'center', background: 'rgba(212, 175, 55, 0.03)', marginTop: '8px' }}>
+                  <input type="file" onChange={handleMultiImageUpload} accept="image/*" multiple id="multi-file-input" style={{ display: 'none' }} />
+                  <label htmlFor="multi-file-input" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'var(--gold-gradient)', color: '#000', fontWeight: 700, padding: '10px 22px', borderRadius: '30px' }}>
+                    <UploadCloud size={18} /> {uploadingImage ? 'Uploading to R2 Storage...' : 'Browse & Upload Multiple Photos (Model, Pleats, Blouse)'}
+                  </label>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '10px' }}>Select multiple photos at once. Images upload directly to Cloudflare R2 Bucket.</p>
                 </div>
-                <input type="text" value={form.imageUrl} onChange={e => setForm({ ...form, imageUrl: e.target.value })} placeholder="https://cdn.houseofnayu.com/products/silk-001.jpg" style={{ width: '100%', marginTop: '6px', background: 'var(--bg-card)', border: '1px solid var(--border-gold)', color: 'var(--text-main)', padding: '8px', borderRadius: '6px', fontSize: '0.85rem' }} />
+
+                {/* Uploaded Photos Thumbnails Preview */}
+                {uploadedCdnUrls.length > 0 && (
+                  <div style={{ marginTop: '14px' }}>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '8px' }}>Uploaded Saree Media Gallery ({uploadedCdnUrls.length} photos):</span>
+                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                      {uploadedCdnUrls.map((url, idx) => (
+                        <div key={idx} style={{ position: 'relative' }}>
+                          <img src={url} alt={`Upload ${idx + 1}`} style={{ width: '60px', height: '80px', objectFit: 'cover', borderRadius: '6px', border: idx === 0 ? '2px solid var(--gold-primary)' : '1px solid var(--border-subtle)' }} />
+                          {idx === 0 && <span style={{ position: 'absolute', top: 2, left: 2, background: 'var(--gold-primary)', color: '#000', fontSize: '0.6rem', fontWeight: 700, padding: '1px 4px', borderRadius: '2px' }}>COVER</span>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                <input type="text" value={form.imageUrl} onChange={e => setForm({ ...form, imageUrl: e.target.value })} placeholder="Cloudflare R2 Primary Cover CDN URL" style={{ width: '100%', marginTop: '10px', background: 'var(--bg-card)', border: '1px solid var(--border-gold)', color: 'var(--text-main)', padding: '8px', borderRadius: '6px', fontSize: '0.85rem' }} />
               </div>
 
               <div style={{ gridColumn: '1 / -1' }}>
