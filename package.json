@@ -14,7 +14,10 @@
     "vite": "^8.2.0"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.12.4",
+    "@supabase/supabase-js": "^2.112.1",
     "canvas-confetti": "^1.9.4",
-    "lucide": "^1.28.0"
+    "lucide": "^1.28.0",
+    "lucide-react": "^1.28.0"
   }
 }
