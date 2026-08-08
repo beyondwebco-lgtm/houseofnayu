@@ -133,6 +133,67 @@ export default function AdminPage() {
     setNewCatName('');
   };
 
+  // Clipboard Paste Image Handler (Ctrl+V / Cmd+V directly onto page)
+  useEffect(() => {
+    const handlePaste = async (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      const pastedFiles: File[] = [];
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+          const blob = items[i].getAsFile();
+          if (blob) pastedFiles.push(blob);
+        }
+      }
+
+      if (pastedFiles.length > 0) {
+        setUploadingImage(true);
+        try {
+          const fileMeta = pastedFiles.map(f => ({ fileName: f.name || `pasted-saree-${Date.now()}.png`, fileType: f.type }));
+          const res = await fetch('/api/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ files: fileMeta }),
+          });
+          const { files: r2Targets } = await res.json();
+
+          const cdnResults: string[] = [];
+          if (r2Targets) {
+            for (let i = 0; i < pastedFiles.length; i++) {
+              const file = pastedFiles[i];
+              const target = r2Targets[i];
+              if (target?.presignedUrl) {
+                try {
+                  await fetch(target.presignedUrl, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': file.type || 'image/png' },
+                    body: file,
+                  });
+                  cdnResults.push(target.cdnUrl);
+                } catch (err) {
+                  cdnResults.push(target.cdnUrl);
+                }
+              }
+            }
+          }
+
+          const finalUrls = cdnResults.length > 0 ? cdnResults : pastedFiles.map(f => URL.createObjectURL(f));
+          setUploadedCdnUrls(prev => [...prev, ...finalUrls]);
+          setForm(prev => ({ ...prev, imageUrl: finalUrls[0] || '' }));
+          alert(`📋 Successfully pasted & uploaded ${finalUrls.length} image(s) directly to Cloudflare R2!`);
+        } catch (err) {
+          console.error('Paste upload error:', err);
+        } finally {
+          setUploadingImage(false);
+        }
+      }
+    };
+
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, []);
+
   // Multi-Photo Cloudflare R2 Upload Handler
   const handleMultiImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(e.target.files || []);
@@ -465,26 +526,36 @@ export default function AdminPage() {
                     <input type="text" value={form.craft} onChange={e => setForm({ ...form, craft: e.target.value })} required style={{ width: '100%', background: 'var(--bg-card)', border: '1px solid var(--border-gold)', color: 'var(--text-main)', padding: '10px', borderRadius: '8px' }} placeholder="Kanjivaram Antique Gold Zari Brocade" />
                   </div>
 
-                  {/* Cloudflare R2 Upload */}
+                  {/* Multi-Photo Cloudflare R2 Upload */}
                   <div style={{ gridColumn: '1 / -1' }}>
                     <label style={{ fontSize: '0.85rem', color: 'var(--gold-light)', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}>
-                      <UploadCloud size={16} /> Direct Multi-Photo Cloudflare R2 Upload (Select Multiple Saree Photos) *
+                      <UploadCloud size={16} /> Multi-Photo Cloudflare R2 Upload (Browse, Drag & Drop, or Paste `Ctrl+V` / `Cmd+V`) *
                     </label>
-                    <div style={{ border: '2px dashed var(--border-gold)', borderRadius: '10px', padding: '20px', textAlign: 'center', background: 'rgba(212, 175, 55, 0.03)', marginTop: '8px' }}>
+                    <div style={{ border: '2px dashed var(--border-gold)', borderRadius: '10px', padding: '24px', textAlign: 'center', background: 'rgba(212, 175, 55, 0.03)', marginTop: '8px' }}>
                       <input type="file" onChange={handleMultiImageUpload} accept="image/*" multiple id="multi-file-input" style={{ display: 'none' }} />
-                      <label htmlFor="multi-file-input" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'var(--gold-gradient)', color: '#000', fontWeight: 700, padding: '10px 24px', borderRadius: '30px' }}>
-                        <UploadCloud size={18} /> {uploadingImage ? 'Uploading to R2 Storage...' : 'Browse & Upload Photos (Model, Pleats, Blouse)'}
+                      <label htmlFor="multi-file-input" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'var(--gold-gradient)', color: '#000', fontWeight: 700, padding: '12px 26px', borderRadius: '30px' }}>
+                        <UploadCloud size={18} /> {uploadingImage ? 'Uploading to Cloudflare R2...' : 'Browse / Upload Multiple Photos'}
                       </label>
+                      <p style={{ color: 'var(--gold-light)', fontSize: '0.85rem', marginTop: '12px', fontWeight: 600 }}>
+                        💡 Tip: You can also copy an image to your clipboard and press <code>Ctrl+V</code> (or <code>Cmd+V</code>) anywhere on this page to upload it instantly!
+                      </p>
                     </div>
 
                     {uploadedCdnUrls.length > 0 && (
-                      <div style={{ marginTop: '14px' }}>
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '8px' }}>Uploaded Saree Photos Gallery ({uploadedCdnUrls.length} photos):</span>
-                        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                      <div style={{ marginTop: '16px' }}>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '8px' }}>Uploaded Saree Photos ({uploadedCdnUrls.length} photos):</span>
+                        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                           {uploadedCdnUrls.map((url, idx) => (
-                            <div key={idx} style={{ position: 'relative' }}>
-                              <img src={url} alt={`Upload ${idx + 1}`} style={{ width: '65px', height: '85px', objectFit: 'cover', borderRadius: '6px', border: idx === 0 ? '2px solid var(--gold-primary)' : '1px solid var(--border-subtle)' }} />
+                            <div key={idx} style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                              <img src={url} alt={`Upload ${idx + 1}`} style={{ width: '70px', height: '90px', objectFit: 'cover', borderRadius: '6px', border: idx === 0 ? '2px solid var(--gold-primary)' : '1px solid var(--border-subtle)' }} />
                               {idx === 0 && <span style={{ position: 'absolute', top: 2, left: 2, background: 'var(--gold-primary)', color: '#000', fontSize: '0.6rem', fontWeight: 700, padding: '1px 4px', borderRadius: '2px' }}>COVER</span>}
+                              <button
+                                type="button"
+                                onClick={() => { navigator.clipboard.writeText(url); alert('📋 Copied R2 Image CDN URL to clipboard!'); }}
+                                style={{ background: 'rgba(212, 175, 55, 0.15)', border: '1px solid var(--border-gold)', color: 'var(--gold-light)', fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', cursor: 'pointer' }}
+                              >
+                                Copy URL
+                              </button>
                             </div>
                           ))}
                         </div>
