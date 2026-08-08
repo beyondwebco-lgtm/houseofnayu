@@ -17,6 +17,17 @@ const r2 = new S3Client({
   },
 });
 
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    },
+  });
+}
+
 export async function POST(request: Request) {
   try {
     const { files } = await request.json(); // Array of { fileName, fileType }
@@ -32,7 +43,7 @@ export async function POST(request: Request) {
         const command = new PutObjectCommand({
           Bucket: r2BucketName,
           Key: uniqueKey,
-          ContentType: file.fileType,
+          ContentType: file.fileType || 'image/jpeg',
         });
 
         // Generate Presigned Put URL for direct browser-to-Cloudflare-R2 upload
@@ -47,7 +58,16 @@ export async function POST(request: Request) {
       })
     );
 
-    return NextResponse.json({ success: true, files: uploadUrls });
+    return NextResponse.json(
+      { success: true, files: uploadUrls },
+      {
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        },
+      }
+    );
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
