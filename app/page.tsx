@@ -31,26 +31,30 @@ export default function StorefrontPage() {
         setCategoriesList(['ALL', ...catData.map((c: any) => c.name)]);
       }
 
-      // Fetch dynamic products
-      const { data, error } = await supabase.from('products').select('*');
+      // Fetch dynamic products from Supabase
+      const { data, error } = await supabase.from('products').select('*').order('created_at', { ascending: false });
       if (!error && data && data.length > 0) {
-        const mapped: Product[] = data.map((item: any) => ({
-          id: item.id,
-          name: item.title,
-          category: item.category_name || 'Cotton Sarees',
-          price: item.price,
-          originalPrice: item.original_price || item.price * 1.3,
-          description: item.description || '',
-          fabric: item.fabric || 'Handloom',
-          craft: item.craft || 'Handcrafted',
-          blouseIncluded: item.blouse_included ?? true,
-          availableSizes: item.available_sizes || ['XS', 'S', 'M', 'L', 'XL'],
-          images: [
-            { id: '1', url: item.image_url || '/images/cotton_1/model_full.jpg', type: 'full' },
-            { id: '2', url: '/images/cotton_1/pleats_detail.jpg', type: 'detail' },
-            { id: '3', url: '/images/cotton_1/blouse.png', type: 'blouse' }
-          ]
-        }));
+        const mapped: Product[] = data.map((item: any) => {
+          const gallery = item.gallery_urls && item.gallery_urls.length > 0
+            ? item.gallery_urls.map((url: string, idx: number) => ({ id: String(idx + 1), url, type: idx === 0 ? 'full' : 'detail' }))
+            : [{ id: '1', url: item.image_url || '/images/cotton_1/model_full.jpg', type: 'full' }];
+
+          return {
+            id: item.id,
+            name: item.title,
+            category: item.category_name || 'Cotton Sarees',
+            price: item.price,
+            originalPrice: item.original_price || item.price * 1.3,
+            description: item.description || '',
+            fabric: item.fabric || 'Handloom',
+            craft: item.craft || 'Handcrafted',
+            blouseIncluded: item.blouse_included ?? true,
+            availableSizes: item.available_sizes || ['XS', 'S', 'M', 'L', 'XL'],
+            images: gallery
+          };
+        });
+
+        // Combine Supabase live uploaded sarees with sample dataset
         setDbProducts(mapped);
       }
     }
