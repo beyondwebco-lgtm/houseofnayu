@@ -9,6 +9,8 @@ import { Product } from '@/src/data';
 import { supabase } from '@/src/supabase';
 import CustomerAuthModal from '@/app/components/CustomerAuthModal';
 
+import { loadCartForUser, saveCartForUser, syncCartOnLogin } from '@/src/cartStorage';
+
 export default function StorefrontPage() {
   const [currentCategory, setCurrentCategory] = useState<string>('ALL');
   const [currentMaxPrice, setCurrentMaxPrice] = useState<number>(10000);
@@ -23,13 +25,26 @@ export default function StorefrontPage() {
   const [customerUser, setCustomerUser] = useState<any>(null);
   const [authModalOpen, setAuthModalOpen] = useState<boolean>(false);
 
+  const updateCartState = (newCart: any[], uId = customerUser?.id) => {
+    setCartItems(newCart);
+    setCartCount(newCart.reduce((a: number, b: any) => a + (b.quantity || 1), 0));
+    saveCartForUser(newCart, uId);
+  };
+
   useEffect(() => {
-    // 1. Sync Customer Supabase Auth Session
+    // 1. Sync Customer Supabase Auth Session and User Cart
     async function checkAuth() {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         setCustomerUser(session.user);
         setAuthModalOpen(false);
+        const userCart = syncCartOnLogin(session.user.id);
+        setCartItems(userCart);
+        setCartCount(userCart.reduce((a: number, b: any) => a + (b.quantity || 1), 0));
+      } else {
+        const guestCart = loadCartForUser(null);
+        setCartItems(guestCart);
+        setCartCount(guestCart.reduce((a: number, b: any) => a + (b.quantity || 1), 0));
       }
     }
     checkAuth();
@@ -38,28 +53,20 @@ export default function StorefrontPage() {
       if (session?.user) {
         setCustomerUser(session.user);
         setAuthModalOpen(false);
+        const userCart = syncCartOnLogin(session.user.id);
+        setCartItems(userCart);
+        setCartCount(userCart.reduce((a: number, b: any) => a + (b.quantity || 1), 0));
       } else {
         setCustomerUser(null);
+        const guestCart = loadCartForUser(null);
+        setCartItems(guestCart);
+        setCartCount(guestCart.reduce((a: number, b: any) => a + (b.quantity || 1), 0));
       }
     });
 
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, []);
-
-  useEffect(() => {
-    // Sync cart from localStorage
-    try {
-      const saved = localStorage.getItem('house_of_nayu_cart');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        setCartItems(parsed);
-        setCartCount(parsed.reduce((a: number, b: any) => a + (b.quantity || 1), 0));
-      }
-    } catch (e) {
-      console.error(e);
-    }
   }, []);
 
   useEffect(() => {
@@ -352,9 +359,7 @@ export default function StorefrontPage() {
                               } else {
                                 updated.splice(idx, 1);
                               }
-                              setCartItems(updated);
-                              setCartCount(updated.reduce((a: number, b: any) => a + (b.quantity || 1), 0));
-                              localStorage.setItem('house_of_nayu_cart', JSON.stringify(updated));
+                              updateCartState(updated);
                             }}
                             style={{ background: 'none', border: 'none', color: 'var(--gold-light)', padding: '4px 10px', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 700 }}
                           >
@@ -365,9 +370,7 @@ export default function StorefrontPage() {
                             onClick={() => {
                               const updated = [...cartItems];
                               updated[idx].quantity = qty + 1;
-                              setCartItems(updated);
-                              setCartCount(updated.reduce((a: number, b: any) => a + (b.quantity || 1), 0));
-                              localStorage.setItem('house_of_nayu_cart', JSON.stringify(updated));
+                              updateCartState(updated);
                             }}
                             style={{ background: 'none', border: 'none', color: 'var(--gold-light)', padding: '4px 10px', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 700 }}
                           >
@@ -380,9 +383,7 @@ export default function StorefrontPage() {
                       <button
                         onClick={() => {
                           const updated = cartItems.filter((_, i) => i !== idx);
-                          setCartItems(updated);
-                          setCartCount(updated.reduce((a: number, b: any) => a + (b.quantity || 1), 0));
-                          localStorage.setItem('house_of_nayu_cart', JSON.stringify(updated));
+                          updateCartState(updated);
                         }}
                         style={{ background: 'none', border: 'none', color: '#ff6b6b', cursor: 'pointer', padding: '8px', fontSize: '1.1rem' }}
                         title="Remove Item"
@@ -409,9 +410,7 @@ export default function StorefrontPage() {
                 onClick={() => {
                   confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
                   alert('✨ Thank you for choosing House of Nayu! Your bespoke order has been placed.');
-                  setCartItems([]);
-                  setCartCount(0);
-                  localStorage.removeItem('house_of_nayu_cart');
+                  updateCartState([]);
                   setCartOpen(false);
                 }}
                 className="btn-gold"

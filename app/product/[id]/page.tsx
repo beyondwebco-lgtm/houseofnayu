@@ -7,6 +7,7 @@ import { ShoppingBag, ArrowLeft, Check, User, LogOut } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { supabase } from '@/src/supabase';
 import CustomerAuthModal from '@/app/components/CustomerAuthModal';
+import { loadCartForUser, saveCartForUser, syncCartOnLogin } from '@/src/cartStorage';
 
 export default function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -19,12 +20,29 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const [customerUser, setCustomerUser] = useState<any>(null);
   const [authModalOpen, setAuthModalOpen] = useState<boolean>(false);
 
+  const [cartOpen, setCartOpen] = useState<boolean>(false);
+  const [cartCount, setCartCount] = useState<number>(0);
+  const [cartItems, setCartItems] = useState<any[]>([]);
+
+  const updateCartState = (newCart: any[], uId = customerUser?.id) => {
+    setCartItems(newCart);
+    setCartCount(newCart.reduce((a: number, b: any) => a + (b.quantity || 1), 0));
+    saveCartForUser(newCart, uId);
+  };
+
   useEffect(() => {
     async function checkAuth() {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         setCustomerUser(session.user);
         setAuthModalOpen(false);
+        const userCart = syncCartOnLogin(session.user.id);
+        setCartItems(userCart);
+        setCartCount(userCart.reduce((a: number, b: any) => a + (b.quantity || 1), 0));
+      } else {
+        const guestCart = loadCartForUser(null);
+        setCartItems(guestCart);
+        setCartCount(guestCart.reduce((a: number, b: any) => a + (b.quantity || 1), 0));
       }
     }
     checkAuth();
@@ -33,8 +51,14 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       if (session?.user) {
         setCustomerUser(session.user);
         setAuthModalOpen(false);
+        const userCart = syncCartOnLogin(session.user.id);
+        setCartItems(userCart);
+        setCartCount(userCart.reduce((a: number, b: any) => a + (b.quantity || 1), 0));
       } else {
         setCustomerUser(null);
+        const guestCart = loadCartForUser(null);
+        setCartItems(guestCart);
+        setCartCount(guestCart.reduce((a: number, b: any) => a + (b.quantity || 1), 0));
       }
     });
 
@@ -62,24 +86,6 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     fetchProduct();
   }, [productId]);
 
-  const [cartCount, setCartCount] = useState<number>(0);
-  const [cartOpen, setCartOpen] = useState<boolean>(false);
-  const [cartItems, setCartItems] = useState<any[]>([]);
-
-  useEffect(() => {
-    // Load cart items from localStorage for cross-page persistence
-    try {
-      const saved = localStorage.getItem('house_of_nayu_cart');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        setCartItems(parsed);
-        setCartCount(parsed.reduce((a: number, b: any) => a + (b.quantity || 1), 0));
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  }, []);
-
   const handleAddToCart = () => {
     // Golden Luxury Ticket Confetti Rain across whole screen
     const duration = 2.5 * 1000;
@@ -106,26 +112,18 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       }
     })();
 
-    try {
-      const saved = localStorage.getItem('house_of_nayu_cart');
-      const items = saved ? JSON.parse(saved) : [];
-      const existingIdx = items.findIndex((i: any) => (i.product?.id || i.id) === product.id && i.selectedSize === selectedSize);
+    const items = [...cartItems];
+    const existingIdx = items.findIndex((i: any) => (i.product?.id || i.id) === product.id && i.selectedSize === selectedSize);
 
-      let updatedCart = [];
-      if (existingIdx > -1) {
-        items[existingIdx].quantity = (items[existingIdx].quantity || 1) + 1;
-        updatedCart = [...items];
-      } else {
-        updatedCart = [...items, { product, selectedSize, quantity: 1 }];
-      }
-
-      setCartItems(updatedCart);
-      setCartCount(updatedCart.reduce((a: number, b: any) => a + (b.quantity || 1), 0));
-      localStorage.setItem('house_of_nayu_cart', JSON.stringify(updatedCart));
-    } catch (e) {
-      console.error(e);
+    let updatedCart = [];
+    if (existingIdx > -1) {
+      items[existingIdx].quantity = (items[existingIdx].quantity || 1) + 1;
+      updatedCart = [...items];
+    } else {
+      updatedCart = [...items, { product, selectedSize, quantity: 1 }];
     }
 
+    updateCartState(updatedCart);
     setAddedToCart(true);
     setCartOpen(true);
     setTimeout(() => setAddedToCart(false), 3500);
@@ -393,9 +391,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                               } else {
                                 updated.splice(idx, 1);
                               }
-                              setCartItems(updated);
-                              setCartCount(updated.reduce((a: number, b: any) => a + (b.quantity || 1), 0));
-                              localStorage.setItem('house_of_nayu_cart', JSON.stringify(updated));
+                              updateCartState(updated);
                             }}
                             style={{ background: 'none', border: 'none', color: 'var(--gold-light)', padding: '4px 10px', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 700 }}
                           >
@@ -406,9 +402,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                             onClick={() => {
                               const updated = [...cartItems];
                               updated[idx].quantity = qty + 1;
-                              setCartItems(updated);
-                              setCartCount(updated.reduce((a: number, b: any) => a + (b.quantity || 1), 0));
-                              localStorage.setItem('house_of_nayu_cart', JSON.stringify(updated));
+                              updateCartState(updated);
                             }}
                             style={{ background: 'none', border: 'none', color: 'var(--gold-light)', padding: '4px 10px', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 700 }}
                           >
@@ -420,9 +414,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                       <button
                         onClick={() => {
                           const updated = cartItems.filter((_, i) => i !== idx);
-                          setCartItems(updated);
-                          setCartCount(updated.reduce((a: number, b: any) => a + (b.quantity || 1), 0));
-                          localStorage.setItem('house_of_nayu_cart', JSON.stringify(updated));
+                          updateCartState(updated);
                         }}
                         style={{ background: 'none', border: 'none', color: '#ff6b6b', cursor: 'pointer', padding: '8px', fontSize: '1.1rem' }}
                         title="Remove Item"
@@ -449,9 +441,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                 onClick={() => {
                   confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
                   alert('✨ Thank you for choosing House of Nayu! Your bespoke order has been placed.');
-                  setCartItems([]);
-                  setCartCount(0);
-                  localStorage.removeItem('house_of_nayu_cart');
+                  updateCartState([]);
                   setCartOpen(false);
                 }}
                 className="btn-gold"
