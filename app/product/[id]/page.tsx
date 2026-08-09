@@ -194,9 +194,9 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       </nav>
 
       <div style={{ maxWidth: '1280px', margin: '120px auto 0 auto', padding: '0 4%' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '50px', alignItems: 'start' }}>
+        <div className="product-detail-grid">
           <div>
-            <div style={{ width: '100%', aspectRatio: '3 / 4', height: '620px', background: '#000', borderRadius: '16px', overflow: 'hidden', border: '1px solid var(--border-gold)', marginBottom: '20px', boxShadow: '0 20px 50px rgba(0,0,0,0.8)' }}>
+            <div className="product-main-img-box">
               <img
                 src={selectedImage || product.gallery_urls?.[0] || product.image_url}
                 alt={product.title}
