@@ -247,12 +247,13 @@ export default function StorefrontPage() {
 
                 return (
                   <div key={product.id} className="product-card">
-                    <Link href={`/product/${product.id}`} className="card-img-wrap" style={{ display: 'block' }}>
+                    <Link href={`/product/${product.id}`} className="card-img-wrap" style={{ display: 'block', color: 'transparent', textDecoration: 'none' }}>
                       <span className="category-badge">{product.category}</span>
                       <img
                         src={coverImage}
-                        alt={product.name}
+                        alt=""
                         loading="lazy"
+                        style={{ color: 'transparent' }}
                       />
                     </Link>
                     <div className="card-body">
