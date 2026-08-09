@@ -137,10 +137,14 @@ export default function StorefrontPage() {
       {/* Top Navbar */}
       <nav className="navbar">
         <div className="brand-left">
-          <Image src="/images/logo_icon_sharp.png" alt="House of Nayu Emblem" width={60} height={60} className="logo-icon-left" />
+          <Link href="/" style={{ display: 'inline-flex', alignItems: 'center' }}>
+            <Image src="/images/logo_icon_sharp.png" alt="House of Nayu Emblem" width={60} height={60} className="logo-icon-left" />
+          </Link>
         </div>
         <div className="brand-center">
-          <Image src="/images/brand_title_sharp.png" alt="House of Nayu Crest" width={450} height={80} priority style={{ height: '80px', width: '450px', objectFit: 'contain', flexShrink: 0 }} />
+          <Link href="/" style={{ display: 'inline-flex', alignItems: 'center' }}>
+            <Image src="/images/brand_title_sharp.png" alt="House of Nayu Crest" width={450} height={80} priority style={{ height: '80px', width: '450px', objectFit: 'contain', flexShrink: 0 }} />
+          </Link>
         </div>
         <div className="nav-actions" style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
           {customerUser ? (

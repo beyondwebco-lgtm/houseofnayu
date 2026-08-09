@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { ShieldCheck, Lock, Mail, ArrowRight } from 'lucide-react';
 import { supabase } from '@/src/supabase';
 
@@ -54,28 +55,29 @@ export default function AdminAuth({ onLoginSuccess }: AdminAuthProps) {
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
       <div style={{ width: '100%', maxWidth: '440px', background: 'var(--bg-surface)', border: '1px solid var(--border-gold)', borderRadius: '16px', padding: '40px 30px', boxShadow: '0 20px 50px rgba(0,0,0,0.8)', textAlign: 'center' }}>
         <div style={{ marginBottom: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-          <Image
-            src="/images/logo_icon_sharp.png"
-            alt="House of Nayu Emblem"
-            width={55}
-            height={55}
-            style={{ filter: 'drop-shadow(0 4px 15px rgba(212, 175, 55, 0.5))' }}
-          />
-          <Image
-            src="/images/brand_title_sharp.png"
-            alt="House of Nayu"
-            width={450}
-            height={80}
-            priority
-            style={{
-              height: '80px',
-              width: '100%',
-              maxWidth: '420px',
-              objectFit: 'contain',
-              filter: 'brightness(1.25) contrast(1.15) drop-shadow(0 2px 14px rgba(212, 175, 55, 0.6))',
-              margin: '6px 0 14px 0',
-            }}
-          />
+          <Link href="/" style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: '8px', textDecoration: 'none' }} title="Return to House of Nayu Storefront">
+            <Image
+              src="/images/logo_icon_sharp.png"
+              alt="House of Nayu Emblem"
+              width={55}
+              height={55}
+              style={{ filter: 'drop-shadow(0 4px 15px rgba(212, 175, 55, 0.5))' }}
+            />
+            <Image
+              src="/images/brand_title_sharp.png"
+              alt="House of Nayu"
+              width={450}
+              height={80}
+              priority
+              style={{
+                height: '80px',
+                width: '100%',
+                maxWidth: '420px',
+                objectFit: 'contain',
+                filter: 'brightness(1.25) contrast(1.15) drop-shadow(0 2px 14px rgba(212, 175, 55, 0.6))',
+              }}
+            />
+          </Link>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(212, 175, 55, 0.12)', border: '1px solid var(--border-gold)', padding: '6px 18px', borderRadius: '20px', color: 'var(--gold-light)', fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.1em' }}>
             <ShieldCheck size={14} /> SECURE ADMIN PORTAL
           </div>

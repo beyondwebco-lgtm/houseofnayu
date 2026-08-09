@@ -155,14 +155,18 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-main)', paddingBottom: '80px' }}>
       <nav className="navbar" style={{ height: '100px', padding: '0 4%', background: 'rgba(10, 10, 10, 0.95)', borderBottom: 'none' }}>
         <div className="brand-left" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <Image src="/images/logo_icon_sharp.png" alt="House of Nayu Emblem" width={60} height={60} className="logo-icon-left" />
+          <Link href="/" style={{ display: 'inline-flex', alignItems: 'center' }}>
+            <Image src="/images/logo_icon_sharp.png" alt="House of Nayu Emblem" width={60} height={60} className="logo-icon-left" />
+          </Link>
           <Link href="/" className="back-link" style={{ color: 'var(--gold-light)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', fontWeight: 600, letterSpacing: '0.05em', padding: '8px 16px', borderRadius: '20px', background: 'rgba(212, 175, 55, 0.08)', border: '1px solid var(--border-gold)' }}>
             <ArrowLeft size={18} /> BACK TO STORE
           </Link>
         </div>
 
         <div className="brand-center">
-          <Image src="/images/brand_title_sharp.png" alt="House of Nayu Crest" width={450} height={80} priority style={{ height: '80px', width: '450px', objectFit: 'contain', flexShrink: 0 }} />
+          <Link href="/" style={{ display: 'inline-flex', alignItems: 'center' }}>
+            <Image src="/images/brand_title_sharp.png" alt="House of Nayu Crest" width={450} height={80} priority style={{ height: '80px', width: '450px', objectFit: 'contain', flexShrink: 0 }} />
+          </Link>
         </div>
 
         <div className="nav-actions" style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
