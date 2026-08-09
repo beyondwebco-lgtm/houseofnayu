@@ -9,9 +9,10 @@ interface CustomerAuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   onLoginSuccess: (user: any) => void;
+  showToast?: (title: string, desc?: string, type?: 'success' | 'info' | 'warning' | 'error') => void;
 }
 
-export default function CustomerAuthModal({ isOpen, onClose, onLoginSuccess }: CustomerAuthModalProps) {
+export default function CustomerAuthModal({ isOpen, onClose, onLoginSuccess, showToast }: CustomerAuthModalProps) {
   const [activeTab, setActiveTab] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -37,7 +38,10 @@ export default function CustomerAuthModal({ isOpen, onClose, onLoginSuccess }: C
     } else if (data?.user) {
       onLoginSuccess(data.user);
       onClose();
-      alert(`✨ Welcome back, ${data.user.user_metadata?.full_name || data.user.email}!`);
+      const userName = data.user.user_metadata?.full_name || data.user.email;
+      if (showToast) {
+        showToast(`✨ Welcome Back, ${userName}!`, 'Access your saved bag, bespoke orders & royal privileges.', 'success');
+      }
     }
   };
 
@@ -72,10 +76,14 @@ export default function CustomerAuthModal({ isOpen, onClose, onLoginSuccess }: C
       // Direct login (Auto-confirm enabled in Supabase)
       onLoginSuccess(data.user);
       onClose();
-      alert(`🎉 Royal Account Created & Signed In! Welcome to House of Nayu, ${fullName || email}!`);
+      if (showToast) {
+        showToast(`🎉 Royal Account Created!`, `Welcome to House of Nayu, ${fullName || email}!`, 'success');
+      }
     } else {
       // Email confirmation required in Supabase
-      alert(`📩 Account Created Successfully!\n\nWe have sent a verification link to ${email}.\n\nPlease check your inbox and click the confirmation link to complete registration & sign in.`);
+      if (showToast) {
+        showToast(`📩 Verification Email Sent!`, `Verification link sent to ${email}. Please confirm to complete login.`, 'info');
+      }
       setActiveTab('signin');
     }
   };

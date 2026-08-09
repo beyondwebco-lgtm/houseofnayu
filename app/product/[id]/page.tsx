@@ -7,6 +7,7 @@ import { ShoppingBag, ArrowLeft, Check, User, LogOut } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { supabase } from '@/src/supabase';
 import CustomerAuthModal from '@/app/components/CustomerAuthModal';
+import LuxuryToast, { ToastMessage } from '@/app/components/LuxuryToast';
 import { loadCartForUser, saveCartForUser, syncCartOnLogin } from '@/src/cartStorage';
 
 export default function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -16,9 +17,14 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const [product, setProduct] = useState<any>(null);
   const [selectedImage, setSelectedImage] = useState<string>('');
   
-  // Customer Auth State
+  // Customer Auth & Toast State
   const [customerUser, setCustomerUser] = useState<any>(null);
   const [authModalOpen, setAuthModalOpen] = useState<boolean>(false);
+  const [toast, setToast] = useState<ToastMessage | null>(null);
+
+  const showToast = (title: string, description?: string, type: 'success' | 'info' | 'warning' | 'error' = 'success') => {
+    setToast({ id: String(Date.now()), title, description, type });
+  };
 
   const [cartOpen, setCartOpen] = useState<boolean>(false);
   const [cartCount, setCartCount] = useState<number>(0);
@@ -440,7 +446,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               <button
                 onClick={() => {
                   confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
-                  alert('✨ Thank you for choosing House of Nayu! Your bespoke order has been placed.');
+                  showToast('✨ Order Placed Successfully!', 'Thank you for choosing House of Nayu! Your bespoke saree order has been placed.', 'success');
                   updateCartState([]);
                   setCartOpen(false);
                 }}
@@ -459,7 +465,11 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}
         onLoginSuccess={(u) => setCustomerUser(u)}
+        showToast={showToast}
       />
+
+      {/* Luxury Toast Notification */}
+      <LuxuryToast toast={toast} onClose={() => setToast(null)} />
     </div>
   );
 }

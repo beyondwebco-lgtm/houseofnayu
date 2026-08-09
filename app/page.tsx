@@ -8,6 +8,7 @@ import confetti from 'canvas-confetti';
 import { Product } from '@/src/data';
 import { supabase } from '@/src/supabase';
 import CustomerAuthModal from '@/app/components/CustomerAuthModal';
+import LuxuryToast, { ToastMessage } from '@/app/components/LuxuryToast';
 
 import { loadCartForUser, saveCartForUser, syncCartOnLogin } from '@/src/cartStorage';
 
@@ -21,9 +22,14 @@ export default function StorefrontPage() {
   const [cartCount, setCartCount] = useState<number>(0);
   const [cartItems, setCartItems] = useState<any[]>([]);
   
-  // Customer Auth State
+  // Customer Auth & Toast State
   const [customerUser, setCustomerUser] = useState<any>(null);
   const [authModalOpen, setAuthModalOpen] = useState<boolean>(false);
+  const [toast, setToast] = useState<ToastMessage | null>(null);
+
+  const showToast = (title: string, description?: string, type: 'success' | 'info' | 'warning' | 'error' = 'success') => {
+    setToast({ id: String(Date.now()), title, description, type });
+  };
 
   const updateCartState = (newCart: any[], uId = customerUser?.id) => {
     setCartItems(newCart);
@@ -409,7 +415,7 @@ export default function StorefrontPage() {
               <button
                 onClick={() => {
                   confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
-                  alert('✨ Thank you for choosing House of Nayu! Your bespoke order has been placed.');
+                  showToast('✨ Order Placed Successfully!', 'Thank you for choosing House of Nayu! Your bespoke saree order has been placed.', 'success');
                   updateCartState([]);
                   setCartOpen(false);
                 }}
@@ -428,7 +434,11 @@ export default function StorefrontPage() {
         isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}
         onLoginSuccess={(u) => setCustomerUser(u)}
+        showToast={showToast}
       />
+
+      {/* Luxury Toast Notification */}
+      <LuxuryToast toast={toast} onClose={() => setToast(null)} />
     </div>
   );
 }
