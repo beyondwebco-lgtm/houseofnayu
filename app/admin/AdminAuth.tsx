@@ -64,16 +64,16 @@ export default function AdminAuth({ onLoginSuccess }: AdminAuthProps) {
           <Image
             src="/images/brand_title_sharp.png"
             alt="House of Nayu"
-            width={350}
-            height={70}
+            width={450}
+            height={80}
             priority
             style={{
-              height: '70px',
-              width: '350px',
-              maxWidth: '100%',
+              height: '80px',
+              width: '100%',
+              maxWidth: '420px',
               objectFit: 'contain',
-              filter: 'drop-shadow(0 2px 14px rgba(212, 175, 55, 0.5)) brightness(1.2)',
-              margin: '4px 0 12px 0',
+              filter: 'brightness(1.25) contrast(1.15) drop-shadow(0 2px 14px rgba(212, 175, 55, 0.6))',
+              margin: '6px 0 14px 0',
             }}
           />
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(212, 175, 55, 0.12)', border: '1px solid var(--border-gold)', padding: '6px 18px', borderRadius: '20px', color: 'var(--gold-light)', fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.1em' }}>
