@@ -3,9 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { RefreshCw, PlusCircle, Package, Trash2, Save, Palette, UploadCloud, LogOut, Edit3, Layers } from 'lucide-react';
+import { PlusCircle, Package, Trash2, Save, Palette, UploadCloud, LogOut, Edit3, Layers } from 'lucide-react';
 import { supabase } from '@/src/supabase';
-import { PRODUCTS_DATA } from '@/src/data';
 import AdminAuth from './AdminAuth';
 
 interface CategoryItem {
@@ -18,13 +17,7 @@ export default function AdminPage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [authChecked, setAuthChecked] = useState<boolean>(false);
 
-  const [categories, setCategories] = useState<CategoryItem[]>([
-    { name: 'Cotton Sarees', slug: 'cotton-sarees' },
-    { name: 'Silk Sarees', slug: 'silk-sarees' },
-    { name: 'Chiffon Sarees', slug: 'chiffon-sarees' },
-    { name: 'Kota Sarees', slug: 'kota-sarees' },
-    { name: 'Sico Sarees', slug: 'sico-sarees' },
-  ]);
+  const [categories, setCategories] = useState<CategoryItem[]>([]);
 
   const [selectedCategoryTab, setSelectedCategoryTab] = useState<string>('ALL');
   const [products, setProducts] = useState<any[]>([]);
@@ -35,7 +28,7 @@ export default function AdminPage() {
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [form, setForm] = useState({
     title: '',
-    category: 'Cotton Sarees',
+    category: '',
     price: '',
     origPrice: '',
     colorName: 'Royal Gold',
@@ -49,50 +42,48 @@ export default function AdminPage() {
   const [uploadedCdnUrls, setUploadedCdnUrls] = useState<string[]>([]);
   const [uploadingImage, setUploadingImage] = useState<boolean>(false);
 
-  // Check Supabase Auth Session
+  // Check Supabase Auth Session for Admin Authorization
   useEffect(() => {
     async function checkUserSession() {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        setCurrentUser(session.user);
+        const u = session.user;
+        const isAdmin = u.email === 'admin123@gmail.com' || u.email === 'admin@houseofnayu.com' || u.user_metadata?.role === 'admin' || u.user_metadata?.role === 'master_admin';
+        if (isAdmin) {
+          setCurrentUser(u);
+        } else {
+          setCurrentUser(null);
+        }
+      } else {
+        setCurrentUser(null);
       }
       setAuthChecked(true);
     }
     checkUserSession();
   }, []);
 
-  // Fetch Categories & Products from Supabase
+  // Fetch Categories & Products strictly from live Supabase DB
   const loadData = async () => {
     setLoading(true);
     
-    // 1. Fetch Categories
+    // 1. Fetch Live Categories
     const { data: catData } = await supabase.from('categories').select('*').order('name');
     if (catData && catData.length > 0) {
-      setCategories(catData.map((c: any) => ({ id: c.id, name: c.name, slug: c.slug })));
+      const loadedCats = catData.map((c: any) => ({ id: c.id, name: c.name, slug: c.slug }));
+      setCategories(loadedCats);
+      setForm(prev => ({ ...prev, category: prev.category || loadedCats[0]?.name || '' }));
+    } else {
+      setCategories([]);
+      setForm(prev => ({ ...prev, category: '' }));
     }
 
-    // 2. Fetch Products
+    // 2. Fetch Live Products ONLY
     const { data: prodData } = await supabase.from('products').select('*').order('created_at', { ascending: false });
-    if (!prodData || prodData.length === 0) {
-      setProducts(PRODUCTS_DATA.map(p => ({
-        id: p.id,
-        title: p.name,
-        category_name: p.category,
-        price: p.price,
-        original_price: p.originalPrice,
-        color_name: 'Gold',
-        color_hex: '#D4AF37',
-        fabric: p.fabric,
-        craft: p.craft,
-        description: p.description,
-        image_url: p.images[0]?.url || '/images/cotton_1/model_full.jpg',
-        gallery_urls: [p.images[0]?.url || '/images/cotton_1/model_full.jpg']
-      })));
-    } else {
+    if (prodData && prodData.length > 0) {
       setProducts(prodData.map((p: any) => ({
         id: p.id,
         title: p.title,
-        category_name: p.category_name || 'Cotton Sarees',
+        category_name: p.category_name || '',
         price: p.price,
         original_price: p.original_price,
         color_name: p.color_name || 'Gold',
@@ -100,9 +91,11 @@ export default function AdminPage() {
         fabric: p.fabric || 'Pure Handloom',
         craft: p.craft || 'Handcrafted',
         description: p.description || '',
-        image_url: p.image_url || '/images/cotton_1/model_full.jpg',
-        gallery_urls: p.gallery_urls || [p.image_url || '/images/cotton_1/model_full.jpg']
+        image_url: p.image_url || '',
+        gallery_urls: p.gallery_urls || [p.image_url].filter(Boolean)
       })));
+    } else {
+      setProducts([]);
     }
     setLoading(false);
   };
@@ -247,6 +240,43 @@ export default function AdminPage() {
     }
   };
 
+  // Delete individual photo from Cloudflare R2 and state
+  const handleDeleteSingleImage = async (urlToDelete: string, idxToDelete: number) => {
+    if (!confirm('Are you sure you want to permanently delete this photo from Cloudflare R2 storage?')) return;
+
+    // 1. Send delete request to Cloudflare R2 API
+    if (urlToDelete && urlToDelete.includes('r2.dev')) {
+      try {
+        await fetch('/api/upload', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileUrl: urlToDelete }),
+        });
+      } catch (e) {
+        console.error('Single image R2 delete error:', e);
+      }
+    }
+
+    // 2. Remove from uploadedCdnUrls state
+    const updatedUrls = uploadedCdnUrls.filter((_, i) => i !== idxToDelete);
+    setUploadedCdnUrls(updatedUrls);
+
+    // Update primary image in form if primary was deleted
+    const newPrimary = updatedUrls[0] || '';
+    setForm(prev => ({ ...prev, imageUrl: newPrimary }));
+
+    // 3. If currently editing a published product, update DB record immediately
+    if (editingProductId) {
+      await supabase.from('products').update({
+        image_url: newPrimary,
+        gallery_urls: updatedUrls
+      }).eq('id', editingProductId);
+      loadData();
+    }
+
+    alert('🗑️ Photo permanently deleted from Cloudflare R2 storage!');
+  };
+
   // Submit / Edit Product Handler
   const handleSubmitProduct = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -313,11 +343,67 @@ export default function AdminPage() {
     window.scrollTo({ top: 300, behavior: 'smooth' });
   };
 
-  // Delete Product
-  const handleDeleteProduct = async (id: string) => {
-    if (!confirm('Are you sure you want to remove this saree from inventory?')) return;
-    await supabase.from('products').delete().eq('id', id);
+  // Delete Single Product & Clean Cloudflare R2 CDN Images
+  const handleDeleteProduct = async (prod: any) => {
+    const prodTitle = prod.title || 'this saree';
+    if (!confirm(`Are you sure you want to remove "${prodTitle}" from inventory and wipe its images from Cloudflare R2?`)) return;
+
+    // 1. Delete associated Cloudflare R2 CDN images
+    const imagesToDelete = prod.gallery_urls && prod.gallery_urls.length > 0 ? prod.gallery_urls : [prod.image_url];
+    for (const url of imagesToDelete) {
+      if (url && url.includes('r2.dev')) {
+        try {
+          await fetch('/api/upload', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fileUrl: url }),
+          });
+        } catch (e) {
+          console.error('R2 deletion error:', e);
+        }
+      }
+    }
+
+    // 2. Delete product from Supabase DB
+    await supabase.from('products').delete().eq('id', prod.id);
     loadData();
+    alert(`🗑️ "${prodTitle}" permanently deleted from inventory & Cloudflare R2!`);
+  };
+
+  // Delete Category & All Products Under It
+  const handleDeleteCategory = async (catName: string) => {
+    if (!confirm(`⚠️ ARE YOU SURE?\nDeleting category "${catName}" will permanently remove all sarees and uploaded photos under this category!`)) return;
+
+    // 1. Find all products under this category
+    const prodsInCat = products.filter(p => p.category_name === catName);
+    
+    // 2. Delete R2 CDN images for all products under this category
+    for (const p of prodsInCat) {
+      const imagesToDelete = p.gallery_urls && p.gallery_urls.length > 0 ? p.gallery_urls : [p.image_url];
+      for (const url of imagesToDelete) {
+        if (url && url.includes('r2.dev')) {
+          try {
+            await fetch('/api/upload', {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ fileUrl: url }),
+            });
+          } catch (e) {
+            console.error('Category R2 delete error:', e);
+          }
+        }
+      }
+    }
+
+    // 3. Delete products under this category from Supabase DB
+    await supabase.from('products').delete().eq('category_name', catName);
+
+    // 4. Delete category from Supabase categories table
+    await supabase.from('categories').delete().eq('name', catName);
+
+    setSelectedCategoryTab('ALL');
+    loadData();
+    alert(`✨ Category "${catName}" and its items were completely deleted!`);
   };
 
   // Filter products by selected category sidebar tab
@@ -333,20 +419,20 @@ export default function AdminPage() {
 
   return (
     <div style={{ background: 'var(--bg-primary)', minHeight: '100vh', color: 'var(--text-main)' }}>
-      {/* Premium Navbar */}
+      {/* Premium Navbar matching Main Storefront Page */}
       <nav className="navbar">
-        <div className="brand-left">
-          <Link href="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none', gap: '10px' }}>
-            <Image src="/images/logo_icon_sharp.png" alt="Emblem" width={50} height={50} />
-            <span style={{ color: 'var(--gold-light)', fontSize: '0.85rem', fontWeight: 700 }}>VIEW LIVE STOREFRONT</span>
+        <div className="brand-left" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <Image src="/images/logo_icon_sharp.png" alt="House of Nayu Emblem" width={60} height={60} className="logo-icon-left" />
+          <Link href="/" className="back-link" style={{ color: 'var(--gold-light)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', fontWeight: 600, letterSpacing: '0.05em', padding: '8px 16px', borderRadius: '20px', background: 'rgba(212, 175, 55, 0.08)', border: '1px solid var(--border-gold)' }}>
+            VIEW STOREFRONT →
           </Link>
         </div>
         <div className="brand-center">
-          <Image src="/images/brand_title_sharp.png" alt="House of Nayu Crest" width={220} height={50} />
+          <Image src="/images/brand_title_sharp.png" alt="House of Nayu Crest" width={450} height={80} priority style={{ height: '80px', width: '450px', objectFit: 'contain', flexShrink: 0 }} />
         </div>
         <div className="nav-actions" style={{ gap: '16px' }}>
-          <span style={{ color: 'var(--gold-light)', fontSize: '0.8rem' }}>
-            Logged in as: <strong>{currentUser.email}</strong>
+          <span style={{ color: 'var(--gold-light)', fontSize: '0.85rem', fontWeight: 500 }}>
+            Logged in as: <strong style={{ color: '#fff' }}>{currentUser.email}</strong>
           </span>
           <button onClick={() => { supabase.auth.signOut(); setCurrentUser(null); }} className="icon-btn" title="Sign Out" style={{ color: '#e74c3c' }}>
             <LogOut size={18} />
@@ -357,18 +443,11 @@ export default function AdminPage() {
       {/* Main Admin Dashboard Container */}
       <div style={{ padding: '110px 3% 60px 3%', maxWidth: '1440px', margin: '0 auto' }}>
         
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '1px solid var(--border-gold)', paddingBottom: '16px' }}>
-          <div>
-            <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: '2.2rem', color: 'var(--gold-light)' }}>
-              Executive Catalog Control Center
-            </h1>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '4px' }}>
-              Select a category on the left sidebar to manage its sarees, edit specs, or add new bespoke collections.
-            </p>
-          </div>
-          <button className="btn-gold" onClick={loadData} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-            <RefreshCw size={16} /> Sync Live DB
-          </button>
+        {/* Minimal Header */}
+        <div style={{ marginBottom: '20px', borderBottom: '1px solid var(--border-gold)', paddingBottom: '12px' }}>
+          <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.8rem', color: 'var(--gold-light)' }}>
+            Catalog Management
+          </h1>
         </div>
 
         {/* 2-Column Luxury Layout: Left Category Navigation Sidebar + Right Product & Upload Panel */}
@@ -434,8 +513,20 @@ export default function AdminPage() {
                       border: '1px solid var(--border-subtle)'
                     }}
                   >
-                    <span>{cat.name}</span>
-                    <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>({catCount})</span>
+                    <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{cat.name}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>({catCount})</span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteCategory(cat.name);
+                        }}
+                        style={{ background: 'none', border: 'none', color: isSelected ? '#721c24' : '#ff6b6b', cursor: 'pointer', padding: '2px 4px', fontSize: '0.85rem' }}
+                        title={`Delete Category "${cat.name}"`}
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
                   </li>
                 );
               })}
@@ -547,15 +638,36 @@ export default function AdminPage() {
                         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                           {uploadedCdnUrls.map((url, idx) => (
                             <div key={idx} style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                              <img src={url} alt={`Upload ${idx + 1}`} style={{ width: '70px', height: '90px', objectFit: 'cover', borderRadius: '6px', border: idx === 0 ? '2px solid var(--gold-primary)' : '1px solid var(--border-subtle)' }} />
+                              <img src={url} alt={`Upload ${idx + 1}`} style={{ width: '75px', height: '95px', objectFit: 'cover', borderRadius: '6px', border: idx === 0 ? '2px solid var(--gold-primary)' : '1px solid var(--border-subtle)' }} />
                               {idx === 0 && <span style={{ position: 'absolute', top: 2, left: 2, background: 'var(--gold-primary)', color: '#000', fontSize: '0.6rem', fontWeight: 700, padding: '1px 4px', borderRadius: '2px' }}>COVER</span>}
+                              
+                              {/* Top-Right Red X Delete Badge */}
                               <button
                                 type="button"
-                                onClick={() => { navigator.clipboard.writeText(url); alert('📋 Copied R2 Image CDN URL to clipboard!'); }}
-                                style={{ background: 'rgba(212, 175, 55, 0.15)', border: '1px solid var(--border-gold)', color: 'var(--gold-light)', fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', cursor: 'pointer' }}
+                                onClick={() => handleDeleteSingleImage(url, idx)}
+                                style={{ position: 'absolute', top: 2, right: 2, background: '#e74c3c', color: '#fff', border: 'none', borderRadius: '50%', width: '20px', height: '20px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(0,0,0,0.8)' }}
+                                title="Delete Photo from Cloudflare R2"
                               >
-                                Copy URL
+                                ✕
                               </button>
+
+                              <div style={{ display: 'flex', gap: '4px', marginTop: '2px' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => { navigator.clipboard.writeText(url); alert('📋 Copied R2 Image CDN URL to clipboard!'); }}
+                                  style={{ background: 'rgba(212, 175, 55, 0.15)', border: '1px solid var(--border-gold)', color: 'var(--gold-light)', fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', cursor: 'pointer' }}
+                                >
+                                  Copy
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteSingleImage(url, idx)}
+                                  style={{ background: 'rgba(231, 76, 60, 0.2)', border: '1px solid #e74c3c', color: '#ff6b6b', fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', cursor: 'pointer' }}
+                                  title="Delete Photo from Cloudflare R2"
+                                >
+                                  Delete
+                                </button>
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -569,9 +681,28 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                <div style={{ marginTop: '20px', textAlign: 'right' }}>
-                  <button type="submit" className="btn-gold" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                    <Save size={16} /> {editingProductId ? 'Update Saree Live' : 'Publish Saree to Storefront'}
+                <div style={{ marginTop: '24px', textAlign: 'right' }}>
+                  <button
+                    type="submit"
+                    className="btn-gold"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: '14px 32px',
+                      fontSize: '1rem',
+                      fontWeight: 700,
+                      letterSpacing: '0.05em',
+                      borderRadius: '30px',
+                      background: 'var(--gold-gradient)',
+                      color: '#000',
+                      border: 'none',
+                      boxShadow: '0 6px 20px rgba(212, 175, 55, 0.4)',
+                      cursor: 'pointer',
+                      transition: 'all 0.25s ease'
+                    }}
+                  >
+                    <Save size={18} /> {editingProductId ? 'Update Saree Specs' : '✨ Publish Saree to Storefront →'}
                   </button>
                 </div>
               </form>
@@ -622,7 +753,7 @@ export default function AdminPage() {
                               <button onClick={() => startEditProduct(p)} style={{ background: 'none', border: 'none', color: 'var(--gold-light)', cursor: 'pointer' }} title="Edit Product Specs">
                                 <Edit3 size={18} />
                               </button>
-                              <button onClick={() => handleDeleteProduct(p.id)} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer' }} title="Delete Product">
+                              <button onClick={() => handleDeleteProduct(p)} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer' }} title="Delete Product & R2 Photos">
                                 <Trash2 size={18} />
                               </button>
                             </div>

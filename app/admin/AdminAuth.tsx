@@ -28,13 +28,20 @@ export default function AdminAuth({ onLoginSuccess }: AdminAuthProps) {
 
       if (error) {
         // Master Admin fallback override for quick setup
-        if (email.trim() === 'admin@houseofnayu.com' && password === 'nayu2026') {
+        if (email.trim().toLowerCase() === 'admin@houseofnayu.com' && password === 'nayu2026') {
           onLoginSuccess({ email: 'admin@houseofnayu.com', role: 'master_admin' });
           return;
         }
         setErrorMsg(error.message);
-      } else if (data.user) {
-        onLoginSuccess(data.user);
+      } else if (data?.user) {
+        const u = data.user;
+        const isAdmin = u.email === 'admin123@gmail.com' || u.email === 'admin@houseofnayu.com' || u.user_metadata?.role === 'admin' || u.user_metadata?.role === 'master_admin';
+        
+        if (isAdmin) {
+          onLoginSuccess(u);
+        } else {
+          setErrorMsg('⛔ Access Denied: Customer accounts do not have executive admin privileges.');
+        }
       }
     } catch (err: any) {
       setErrorMsg(err.message || 'Login failed');

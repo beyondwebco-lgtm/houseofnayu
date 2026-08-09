@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { NextResponse } from 'next/server';
 
@@ -28,9 +28,10 @@ export async function OPTIONS() {
   });
 }
 
+// Generate Presigned Upload URLs
 export async function POST(request: Request) {
   try {
-    const { files } = await request.json(); // Array of { fileName, fileType }
+    const { files } = await request.json();
 
     if (!files || !Array.isArray(files)) {
       return NextResponse.json({ error: 'Files array required' }, { status: 400 });
@@ -46,7 +47,6 @@ export async function POST(request: Request) {
           ContentType: file.fileType || 'image/jpeg',
         });
 
-        // Generate Presigned Put URL for direct browser-to-Cloudflare-R2 upload
         const presignedUrl = await getSignedUrl(r2, command, { expiresIn: 3600 });
         const cdnUrl = `${r2PublicCdnUrl}/${uniqueKey}`;
 
@@ -68,6 +68,31 @@ export async function POST(request: Request) {
         },
       }
     );
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+
+// Direct Delete File from Cloudflare R2 Bucket
+export async function DELETE(request: Request) {
+  try {
+    const { fileUrl } = await request.json();
+
+    if (!fileUrl) {
+      return NextResponse.json({ error: 'fileUrl required' }, { status: 400 });
+    }
+
+    // Extract object key from CDN URL (e.g. sarees/178622412-photo.jpg)
+    const key = fileUrl.replace(`${r2PublicCdnUrl}/`, '');
+
+    const command = new DeleteObjectCommand({
+      Bucket: r2BucketName,
+      Key: key,
+    });
+
+    await r2.send(command);
+
+    return NextResponse.json({ success: true, message: `Deleted ${key} from Cloudflare R2 storage` });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }

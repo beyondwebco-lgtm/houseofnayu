@@ -1,30 +1,25 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { use, useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ShoppingBag, Eye, SlidersHorizontal, Sparkles, X, ChevronUp, Search, User, LogOut } from 'lucide-react';
+import { ShoppingBag, ArrowLeft, Check, User, LogOut } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { Product } from '@/src/data';
 import { supabase } from '@/src/supabase';
 import CustomerAuthModal from '@/app/components/CustomerAuthModal';
 
-export default function StorefrontPage() {
-  const [currentCategory, setCurrentCategory] = useState<string>('ALL');
-  const [currentMaxPrice, setCurrentMaxPrice] = useState<number>(10000);
-  const [filterActive, setFilterActive] = useState<boolean>(false);
-  const [dbProducts, setDbProducts] = useState<Product[]>([]);
-  const [categoriesList, setCategoriesList] = useState<string[]>(['ALL']);
-  const [cartOpen, setCartOpen] = useState<boolean>(false);
-  const [cartCount, setCartCount] = useState<number>(0);
-  const [cartItems, setCartItems] = useState<any[]>([]);
+export default function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = use(params);
+  const productId = resolvedParams.id;
+
+  const [product, setProduct] = useState<any>(null);
+  const [selectedImage, setSelectedImage] = useState<string>('');
   
   // Customer Auth State
   const [customerUser, setCustomerUser] = useState<any>(null);
   const [authModalOpen, setAuthModalOpen] = useState<boolean>(false);
 
   useEffect(() => {
-    // 1. Sync Customer Supabase Auth Session
     async function checkAuth() {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
@@ -47,9 +42,32 @@ export default function StorefrontPage() {
       authListener.subscription.unsubscribe();
     };
   }, []);
+  const [selectedSize, setSelectedSize] = useState<string>('S');
+  const [loading, setLoading] = useState<boolean>(true);
+  const [addedToCart, setAddedToCart] = useState<boolean>(false);
 
   useEffect(() => {
-    // Sync cart from localStorage
+    async function fetchProduct() {
+      if (!productId) return;
+      setLoading(true);
+      const { data, error } = await supabase.from('products').select('*').eq('id', productId).single();
+      
+      if (!error && data) {
+        setProduct(data);
+        const cover = data.gallery_urls && data.gallery_urls.length > 0 ? data.gallery_urls[0] : data.image_url;
+        setSelectedImage(cover);
+      }
+      setLoading(false);
+    }
+    fetchProduct();
+  }, [productId]);
+
+  const [cartCount, setCartCount] = useState<number>(0);
+  const [cartOpen, setCartOpen] = useState<boolean>(false);
+  const [cartItems, setCartItems] = useState<any[]>([]);
+
+  useEffect(() => {
+    // Load cart items from localStorage for cross-page persistence
     try {
       const saved = localStorage.getItem('house_of_nayu_cart');
       if (saved) {
@@ -62,73 +80,87 @@ export default function StorefrontPage() {
     }
   }, []);
 
-  useEffect(() => {
-    async function fetchStoreData() {
-      // 1. Fetch live categories created by user
-      const { data: catData } = await supabase.from('categories').select('name').order('name');
-      if (catData && catData.length > 0) {
-        setCategoriesList(['ALL', ...catData.map((c: any) => c.name)]);
+  const handleAddToCart = () => {
+    // Golden Luxury Ticket Confetti Rain across whole screen
+    const duration = 2.5 * 1000;
+    const end = Date.now() + duration;
+
+    (function frame() {
+      confetti({
+        particleCount: 7,
+        angle: 60,
+        spread: 55,
+        origin: { x: 0 },
+        colors: ['#D4AF37', '#FFD700', '#F3E5AB', '#DAA520', '#FFFFFF']
+      });
+      confetti({
+        particleCount: 7,
+        angle: 120,
+        spread: 55,
+        origin: { x: 1 },
+        colors: ['#D4AF37', '#FFD700', '#F3E5AB', '#DAA520', '#FFFFFF']
+      });
+
+      if (Date.now() < end) {
+        requestAnimationFrame(frame);
       }
+    })();
 
-      // 2. Fetch live products created by user ONLY
-      const { data, error } = await supabase.from('products').select('*').order('created_at', { ascending: false });
-      if (!error && data && data.length > 0) {
-        const mapped: Product[] = data.map((item: any) => {
-          const uniqueUrls = item.gallery_urls && item.gallery_urls.length > 0
-            ? Array.from(new Set(item.gallery_urls as string[]))
-            : [item.image_url];
+    try {
+      const saved = localStorage.getItem('house_of_nayu_cart');
+      const items = saved ? JSON.parse(saved) : [];
+      const existingIdx = items.findIndex((i: any) => (i.product?.id || i.id) === product.id && i.selectedSize === selectedSize);
 
-          const gallery = uniqueUrls.filter(Boolean).map((url: string, idx: number) => ({
-            id: String(idx + 1),
-            url: url,
-            type: (idx === 0 ? 'full' : 'detail') as 'full' | 'detail' | 'blouse'
-          }));
-
-          return {
-            id: item.id,
-            name: item.title,
-            category: item.category_name || 'General',
-            price: item.price,
-            originalPrice: item.original_price || item.price * 1.3,
-            description: item.description || '',
-            fabric: item.fabric || '',
-            craft: item.craft || '',
-            blouseIncluded: item.blouse_included ?? true,
-            availableSizes: item.available_sizes || ['XS', 'S', 'M', 'L', 'XL'],
-            images: gallery
-          };
-        });
-
-        setDbProducts(mapped);
+      let updatedCart = [];
+      if (existingIdx > -1) {
+        items[existingIdx].quantity = (items[existingIdx].quantity || 1) + 1;
+        updatedCart = [...items];
       } else {
-        setDbProducts([]);
+        updatedCart = [...items, { product, selectedSize, quantity: 1 }];
       }
+
+      setCartItems(updatedCart);
+      setCartCount(updatedCart.reduce((a: number, b: any) => a + (b.quantity || 1), 0));
+      localStorage.setItem('house_of_nayu_cart', JSON.stringify(updatedCart));
+    } catch (e) {
+      console.error(e);
     }
-    fetchStoreData();
-  }, []);
 
-  const [searchQuery, setSearchQuery] = useState<string>('');
+    setAddedToCart(true);
+    setCartOpen(true);
+    setTimeout(() => setAddedToCart(false), 3500);
+  };
 
-  const filteredProducts = dbProducts.filter(p => {
-    const matchesCat = currentCategory === 'ALL' || p.category === currentCategory;
-    const matchesPrice = p.price <= currentMaxPrice;
-    const matchesSearch = !searchQuery.trim() || 
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      p.fabric.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      p.craft.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCat && matchesPrice && matchesSearch;
-  });
+  if (loading) {
+    return <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold-light)' }}>Loading Luxury Details...</div>;
+  }
+
+  if (!product) {
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', padding: '100px 20px', textAlign: 'center', color: 'var(--gold-light)' }}>
+        <h2>Product Not Found</h2>
+        <p style={{ margin: '20px 0' }}>The requested saree could not be located in our inventory.</p>
+        <Link href="/" className="btn-gold" style={{ display: 'inline-flex', gap: '8px', textDecoration: 'none' }}>
+          <ArrowLeft size={18} /> Return to Storefront
+        </Link>
+      </div>
+    );
+  }
 
   return (
-    <div className="next-root">
-      {/* Top Navbar */}
-      <nav className="navbar">
-        <div className="brand-left">
+    <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-main)', paddingBottom: '80px' }}>
+      <nav className="navbar" style={{ height: '100px', padding: '0 4%', background: 'rgba(10, 10, 10, 0.95)', borderBottom: 'none' }}>
+        <div className="brand-left" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <Image src="/images/logo_icon_sharp.png" alt="House of Nayu Emblem" width={60} height={60} className="logo-icon-left" />
+          <Link href="/" className="back-link" style={{ color: 'var(--gold-light)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', fontWeight: 600, letterSpacing: '0.05em', padding: '8px 16px', borderRadius: '20px', background: 'rgba(212, 175, 55, 0.08)', border: '1px solid var(--border-gold)' }}>
+            <ArrowLeft size={18} /> BACK TO STORE
+          </Link>
         </div>
+
         <div className="brand-center">
           <Image src="/images/brand_title_sharp.png" alt="House of Nayu Crest" width={450} height={80} priority style={{ height: '80px', width: '450px', objectFit: 'contain', flexShrink: 0 }} />
         </div>
+
         <div className="nav-actions" style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
           {customerUser ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(212, 175, 55, 0.1)', padding: '6px 14px', borderRadius: '25px', border: '1px solid var(--border-gold)' }}>
@@ -161,127 +193,148 @@ export default function StorefrontPage() {
         </div>
       </nav>
 
-      {/* Hero Header */}
-      <header className="hero-banner-minimal">
-        <div className="hero-content-minimal">
-          <span className="gold-badge-tag"><Sparkles size={14} /> THE HERITAGE EDIT</span>
-          <h1 className="hero-headline">Handcrafted Elegance</h1>
-          <p className="hero-subtext-gold">Explore custom sarees woven by India’s finest master artisans.</p>
-        </div>
-      </header>
-
-      {/* Main Catalog */}
-      <main className="store-layout">
-        <div className="filter-top-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', width: '100%', margin: '20px 0 30px 0' }}>
-          <button className={`filter-toggle-btn-transparent-left ${filterActive ? 'active' : ''}`} onClick={() => setFilterActive(!filterActive)}>
-            <SlidersHorizontal size={16} />
-            <span>FILTER BY CATEGORY</span>
-          </button>
-
-          {/* Storefront Search Bar - Centered in Middle */}
-          <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', width: '420px', maxWidth: '80%' }}>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Search sarees by name, fabric, weave..."
-              style={{ width: '100%', background: 'var(--bg-card)', border: '1px solid var(--border-gold)', color: 'var(--text-main)', padding: '11px 16px 11px 42px', borderRadius: '30px', fontSize: '0.9rem', outline: 'none', boxShadow: '0 4px 15px rgba(0,0,0,0.4)' }}
-            />
-            <Search size={18} style={{ position: 'absolute', left: '16px', top: '12px', color: 'var(--gold-light)' }} />
-          </div>
-
-          <div style={{ width: '160px' }}></div>
-        </div>
-
-        <div className={`store-grid-container ${filterActive ? 'filter-active' : ''}`}>
-          {/* Left Expandable Sidebar */}
-          <aside className={`sidebar-filters-panel ${filterActive ? '' : 'hidden'}`}>
-            <div className="sidebar-header">
-              <h2>FILTERS</h2>
-              <button className="icon-btn-sm" onClick={() => setFilterActive(false)}><X size={16} /></button>
+      <div style={{ maxWidth: '1280px', margin: '120px auto 0 auto', padding: '0 4%' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '50px', alignItems: 'start' }}>
+          <div>
+            <div style={{ width: '100%', aspectRatio: '3 / 4', height: '620px', background: '#000', borderRadius: '16px', overflow: 'hidden', border: '1px solid var(--border-gold)', marginBottom: '20px', boxShadow: '0 20px 50px rgba(0,0,0,0.8)' }}>
+              <img
+                src={selectedImage || product.gallery_urls?.[0] || product.image_url}
+                alt={product.title}
+                style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top' }}
+              />
             </div>
 
-            {/* Price Accordion */}
-            <div className="filter-accordion open">
-              <div className="accordion-header">
-                <span>PRICE</span>
-                <ChevronUp size={16} />
+            {product.gallery_urls && product.gallery_urls.length > 1 && (
+              <div style={{ display: 'flex', gap: '14px', overflowX: 'auto', paddingBottom: '10px' }}>
+                {product.gallery_urls.map((img: string, idx: number) => (
+                  <img
+                    key={idx}
+                    src={img}
+                    alt={`Thumbnail ${idx + 1}`}
+                    onClick={() => setSelectedImage(img)}
+                    style={{
+                      width: '80px',
+                      height: '105px',
+                      objectFit: 'cover',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      border: (selectedImage || product.gallery_urls[0]) === img ? '2px solid var(--gold-primary)' : '1px solid var(--border-subtle)',
+                      opacity: (selectedImage || product.gallery_urls[0]) === img ? 1 : 0.6,
+                      transition: 'all 0.2s ease'
+                    }}
+                  />
+                ))}
               </div>
-              <div className="accordion-body">
-                <div className="price-slider-wrap">
-                  <div className="price-val-row">
-                    <span>Under: <strong style={{ color: 'var(--gold-light)' }}>₹{currentMaxPrice.toLocaleString('en-IN')}</strong></span>
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Max: ₹10,000</span>
-                  </div>
-                  <div className="range-slider-container">
-                    <input type="range" min="3000" max="10000" step="500" value={currentMaxPrice} onChange={e => setCurrentMaxPrice(Number(e.target.value))} className="range-input-active" />
-                  </div>
+            )}
+          </div>
+
+          <div>
+            <span className="category-badge" style={{ position: 'static', fontSize: '0.8rem', letterSpacing: '0.15em', padding: '6px 14px', display: 'inline-block', marginBottom: '12px' }}>
+              {product.category_name}
+            </span>
+
+            <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: '2.5rem', color: 'var(--gold-light)', margin: '12px 0 20px 0', lineHeight: 1.25 }}>
+              {product.title}
+            </h1>
+
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '16px', margin: '20px 0' }}>
+              <span style={{ fontSize: '2.2rem', color: 'var(--gold-light)', fontWeight: 700, fontFamily: 'var(--font-sans)' }}>
+                ₹{product.price.toLocaleString('en-IN')}
+              </span>
+              {product.original_price && product.original_price > product.price && (
+                <span style={{ fontSize: '1.3rem', color: 'var(--text-muted)', textDecoration: 'line-through' }}>
+                  ₹{product.original_price.toLocaleString('en-IN')}
+                </span>
+              )}
+            </div>
+
+            {product.color_name && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '20px 0' }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', letterSpacing: '0.05em' }}>COLOR PALETTE:</span>
+                <span style={{ width: '18px', height: '18px', borderRadius: '50%', background: product.color_hex || '#D4AF37', display: 'inline-block', border: '1px solid var(--border-gold)' }}></span>
+                <strong style={{ color: 'var(--gold-light)', fontSize: '0.9rem' }}>{product.color_name}</strong>
+              </div>
+            )}
+
+            <div style={{ background: 'rgba(212, 175, 55, 0.04)', border: '1px solid var(--border-gold)', borderRadius: '12px', padding: '20px', margin: '24px 0' }}>
+              <strong style={{ color: 'var(--gold-light)', fontSize: '0.85rem', letterSpacing: '0.1em', display: 'block', marginBottom: '14px' }}>
+                ✨ CRAFT & SPECIFICATIONS
+              </strong>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', fontSize: '0.9rem' }}>
+                <div>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem' }}>FABRIC MATERIAL</span>
+                  <strong style={{ color: 'var(--text-main)' }}>{product.fabric || 'Pure Handloom'}</strong>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem' }}>WEAVING CRAFT</span>
+                  <strong style={{ color: 'var(--text-main)' }}>{product.craft || 'Traditional Weave'}</strong>
                 </div>
               </div>
             </div>
 
-            {/* Category Accordion */}
-            <div className="filter-accordion open">
-              <div className="accordion-header">
-                <span>CATEGORY & FABRIC</span>
-                <ChevronUp size={16} />
-              </div>
-              <div className="accordion-body">
-                <ul className="category-checkbox-list">
-                  {categoriesList.map(cat => (
-                    <li key={cat} className={`filter-checkbox-item ${currentCategory === cat ? 'active' : ''}`} onClick={() => setCurrentCategory(cat)}>
-                      <span className={`custom-checkbox ${currentCategory === cat ? 'checked' : ''}`}></span>
-                      <span className="checkbox-label">{cat === 'ALL' ? 'All Collections' : cat}</span>
-                    </li>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: 1.7, margin: '24px 0' }}>
+              {product.description || 'Exquisitely handcrafted by India’s finest master weavers using traditional techniques passed down through generations.'}
+            </p>
+
+            {product.available_sizes && product.available_sizes.length > 0 && !product.available_sizes.includes('Free Size / Unstitched') && (
+              <div style={{ margin: '28px 0' }}>
+                <strong style={{ color: 'var(--gold-light)', fontSize: '0.85rem', letterSpacing: '0.08em', display: 'block', marginBottom: '12px' }}>
+                  SELECT SIZE / STITCHING PREFERENCE:
+                </strong>
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                  {product.available_sizes.map((sz: string) => (
+                    <button
+                      key={sz}
+                      onClick={() => setSelectedSize(sz)}
+                      style={{
+                        padding: '10px 20px',
+                        borderRadius: '24px',
+                        border: selectedSize === sz ? '1px solid var(--gold-primary)' : '1px solid var(--border-subtle)',
+                        background: selectedSize === sz ? 'var(--gold-gradient)' : 'var(--bg-card)',
+                        color: selectedSize === sz ? '#000' : 'var(--text-main)',
+                        fontWeight: selectedSize === sz ? 700 : 500,
+                        cursor: 'pointer',
+                        fontSize: '0.9rem',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      {sz}
+                    </button>
                   ))}
-                </ul>
+                </div>
               </div>
-            </div>
-          </aside>
+            )}
 
-          {/* Product Gallery Grid */}
-          <div className="products-gallery-col">
-            <div className="product-grid">
-              {filteredProducts.map(product => {
-                const coverImage = product.images[0]?.url || '/images/cotton_1/model_full.jpg';
-
-                return (
-                  <div key={product.id} className="product-card">
-                    <Link href={`/product/${product.id}`} className="card-img-wrap" style={{ display: 'block' }}>
-                      <span className="category-badge">{product.category}</span>
-                      <img
-                        src={coverImage}
-                        alt={product.name}
-                        loading="lazy"
-                      />
-                    </Link>
-                    <div className="card-body">
-                      <h3 className="product-title">
-                        <Link href={`/product/${product.id}`} style={{ color: 'inherit', textDecoration: 'none' }}>
-                          {product.name}
-                        </Link>
-                      </h3>
-                      <div className="product-price-wrap">
-                        <span className="current-price">₹{product.price.toLocaleString('en-IN')}</span>
-                        {product.originalPrice && (
-                          <span className="original-price">₹{product.originalPrice.toLocaleString('en-IN')}</span>
-                        )}
-                      </div>
-                      <div className="card-actions" style={{ justifyContent: 'center' }}>
-                        <Link href={`/product/${product.id}`} className="add-cart-btn" style={{ width: '100%', justifyContent: 'center', textDecoration: 'none' }}>
-                          <Eye size={16} /> View Saree Showcase
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            <button
+              onClick={handleAddToCart}
+              style={{
+                width: '100%',
+                padding: '18px 24px',
+                fontSize: '1.15rem',
+                fontWeight: 700,
+                marginTop: '28px',
+                background: 'linear-gradient(135deg, #D4AF37 0%, #FFD700 50%, #B8860B 100%)',
+                color: '#000',
+                border: 'none',
+                borderRadius: '30px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '12px',
+                boxShadow: '0 10px 30px rgba(212, 175, 55, 0.4), 0 0 20px rgba(255, 215, 0, 0.3)',
+                transition: 'all 0.3s ease',
+                letterSpacing: '0.05em',
+                transform: addedToCart ? 'scale(1.02)' : 'scale(1)',
+              }}
+            >
+              {addedToCart ? <Check size={22} /> : <ShoppingBag size={22} />}
+              {addedToCart ? `✨ Added To Royal Bag!` : `Add To Royal Bag — ₹${product.price.toLocaleString('en-IN')}`}
+            </button>
           </div>
         </div>
-      </main>
+      </div>
 
-      {/* Libas-Inspired Slide-Over Cart Drawer */}
       <div className={`cart-sidebar-backdrop ${cartOpen ? 'active' : ''}`} onClick={() => setCartOpen(false)}>
         <div className={`cart-sidebar-panel ${cartOpen ? 'active' : ''}`} onClick={e => e.stopPropagation()} style={{ width: '420px', maxWidth: '90vw', background: '#111111', borderLeft: '1px solid var(--border-gold)', padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '-15px 0 50px rgba(0,0,0,0.95)' }}>
           <div>
@@ -331,7 +384,6 @@ export default function StorefrontPage() {
                           <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '8px' }}>Size: {item.selectedSize}</span>
                         )}
 
-                        {/* Quantity Controls - 1 + */}
                         <div style={{ display: 'inline-flex', alignItems: 'center', border: '1px solid var(--border-gold)', borderRadius: '20px', background: 'rgba(0,0,0,0.5)', overflow: 'hidden' }}>
                           <button
                             onClick={() => {
@@ -365,7 +417,6 @@ export default function StorefrontPage() {
                         </div>
                       </div>
 
-                      {/* Trash Bin Remove */}
                       <button
                         onClick={() => {
                           const updated = cartItems.filter((_, i) => i !== idx);
