@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { PlusCircle, Package, Trash2, Save, Palette, UploadCloud, LogOut, Edit3, Layers } from 'lucide-react';
 import { supabase } from '@/src/supabase';
 import AdminAuth from './AdminAuth';
+import LuxuryToast, { ToastMessage } from '@/app/components/LuxuryToast';
 
 interface CategoryItem {
   id?: string;
@@ -16,6 +17,11 @@ interface CategoryItem {
 export default function AdminPage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [authChecked, setAuthChecked] = useState<boolean>(false);
+  const [toast, setToast] = useState<ToastMessage | null>(null);
+
+  const showToast = (title: string, description?: string, type: 'success' | 'info' | 'warning' | 'error' = 'success') => {
+    setToast({ id: String(Date.now()), title, description, type });
+  };
 
   const [categories, setCategories] = useState<CategoryItem[]>([]);
 
@@ -274,7 +280,7 @@ export default function AdminPage() {
       loadData();
     }
 
-    alert('🗑️ Photo permanently deleted from Cloudflare R2 storage!');
+    showToast('🗑️ Photo Deleted', 'Photo permanently deleted from Cloudflare R2 storage!', 'info');
   };
 
   // Submit / Edit Product Handler
@@ -304,17 +310,17 @@ export default function AdminPage() {
       // Update existing saree product
       const { error } = await supabase.from('products').update(productPayload).eq('id', editingProductId);
       if (error) {
-        alert(`Update Error: ${error.message}`);
+        showToast('Update Error', error.message, 'error');
       } else {
-        alert(`✨ Successfully updated "${form.title}"! Changes will instantly reflect on the storefront.`);
+        showToast('✨ Saree Updated!', `Successfully updated "${form.title}" on the storefront catalog.`, 'success');
       }
     } else {
       // Insert new saree product
       const { error } = await supabase.from('products').insert([productPayload]);
       if (error) {
-        alert(`Insert Error: ${error.message}`);
+        showToast('Publish Error', error.message, 'error');
       } else {
-        alert(`✨ "${form.title}" published live to storefront under category "${form.category}"!`);
+        showToast('✨ Saree Published Live!', `"${form.title}" is now live under category "${form.category}".`, 'success');
       }
     }
 
@@ -769,6 +775,9 @@ export default function AdminPage() {
           </main>
         </div>
       </div>
+
+      {/* Luxury Toast Notification */}
+      <LuxuryToast toast={toast} onClose={() => setToast(null)} />
     </div>
   );
 }
