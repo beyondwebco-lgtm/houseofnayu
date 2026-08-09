@@ -46,10 +46,14 @@ export default function CustomerAuthModal({ isOpen, onClose, onLoginSuccess }: C
     setLoading(true);
     setErrorMsg('');
 
+    // Dynamic redirect URL for email confirmation (Redirects back to live Vercel site or current origin)
+    const redirectUrl = typeof window !== 'undefined' ? `${window.location.origin}` : 'https://houseofnayu.vercel.app';
+
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
+        emailRedirectTo: redirectUrl,
         data: {
           full_name: fullName,
           role: 'customer',
@@ -57,27 +61,21 @@ export default function CustomerAuthModal({ isOpen, onClose, onLoginSuccess }: C
       },
     });
 
+    setLoading(false);
+
     if (error) {
-      setLoading(false);
       setErrorMsg(error.message);
       return;
     }
 
-    // Instant sign-in after signup
-    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    setLoading(false);
-    const activeUser = signInData?.user || data?.user;
-
-    if (activeUser) {
-      onLoginSuccess(activeUser);
+    if (data?.session) {
+      // Direct login (Auto-confirm enabled in Supabase)
+      onLoginSuccess(data.user);
       onClose();
-      alert(`🎉 Royal Account Created & Logged In! Welcome to House of Nayu, ${fullName || email}!`);
-    } else if (signInError) {
-      alert(`🎉 Account created! Please sign in with your email & password.`);
+      alert(`🎉 Royal Account Created & Signed In! Welcome to House of Nayu, ${fullName || email}!`);
+    } else {
+      // Email confirmation required in Supabase
+      alert(`📩 Account Created Successfully!\n\nWe have sent a verification link to ${email}.\n\nPlease check your inbox and click the confirmation link to complete registration & sign in.`);
       setActiveTab('signin');
     }
   };
