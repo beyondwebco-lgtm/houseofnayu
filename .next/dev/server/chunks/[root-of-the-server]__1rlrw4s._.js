@@ -81,6 +81,8 @@ module.exports = mod;
 "use strict";
 
 __turbopack_context__.s([
+    "DELETE",
+    ()=>DELETE,
     "OPTIONS",
     ()=>OPTIONS,
     "POST",
@@ -117,7 +119,7 @@ async function OPTIONS() {
 }
 async function POST(request) {
     try {
-        const { files } = await request.json(); // Array of { fileName, fileType }
+        const { files } = await request.json();
         if (!files || !Array.isArray(files)) {
             return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
                 error: 'Files array required'
@@ -132,7 +134,6 @@ async function POST(request) {
                 Key: uniqueKey,
                 ContentType: file.fileType || 'image/jpeg'
             });
-            // Generate Presigned Put URL for direct browser-to-Cloudflare-R2 upload
             const presignedUrl = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$aws$2d$sdk$2f$s3$2d$request$2d$presigner$2f$dist$2d$es$2f$getSignedUrl$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["getSignedUrl"])(r2, command, {
                 expiresIn: 3600
             });
@@ -152,6 +153,36 @@ async function POST(request) {
                 'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
                 'Access-Control-Allow-Headers': 'Content-Type, Authorization'
             }
+        });
+    } catch (error) {
+        return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
+            success: false,
+            error: error.message
+        }, {
+            status: 500
+        });
+    }
+}
+async function DELETE(request) {
+    try {
+        const { fileUrl } = await request.json();
+        if (!fileUrl) {
+            return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
+                error: 'fileUrl required'
+            }, {
+                status: 400
+            });
+        }
+        // Extract object key from CDN URL (e.g. sarees/178622412-photo.jpg)
+        const key = fileUrl.replace(`${r2PublicCdnUrl}/`, '');
+        const command = new __TURBOPACK__imported__module__$5b$externals$5d2f40$aws$2d$sdk$2f$client$2d$s3__$5b$external$5d$__$2840$aws$2d$sdk$2f$client$2d$s3$2c$__cjs$2c$__$5b$project$5d2f$node_modules$2f40$aws$2d$sdk$2f$client$2d$s3$29$__["DeleteObjectCommand"]({
+            Bucket: r2BucketName,
+            Key: key
+        });
+        await r2.send(command);
+        return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
+            success: true,
+            message: `Deleted ${key} from Cloudflare R2 storage`
         });
     } catch (error) {
         return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
