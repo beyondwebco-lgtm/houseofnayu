@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Image from 'next/image';
 import { X, Lock, Mail, User, Sparkles } from 'lucide-react';
 import { supabase } from '@/src/supabase';
 
@@ -131,11 +132,33 @@ export default function CustomerAuthModal({ isOpen, onClose, onLoginSuccess }: C
         </button>
 
         {/* Brand Header */}
-        <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <Image
+            src="/images/logo_icon_sharp.png"
+            alt="House of Nayu Emblem"
+            width={45}
+            height={45}
+            style={{ filter: 'drop-shadow(0 4px 12px rgba(212, 175, 55, 0.45))', marginBottom: '4px' }}
+          />
+          <Image
+            src="/images/brand_title_sharp.png"
+            alt="House of Nayu Crest"
+            width={320}
+            height={60}
+            priority
+            style={{
+              height: '60px',
+              width: '320px',
+              maxWidth: '100%',
+              objectFit: 'contain',
+              filter: 'drop-shadow(0 2px 14px rgba(212, 175, 55, 0.5)) brightness(1.2)',
+              marginBottom: '10px',
+            }}
+          />
           <span className="gold-badge-tag" style={{ display: 'inline-flex', gap: '6px', alignItems: 'center', marginBottom: '8px', fontSize: '0.75rem' }}>
             <Sparkles size={13} /> ROYAL CLUB ACCESS
           </span>
-          <h2 style={{ fontFamily: 'var(--font-serif)', color: 'var(--gold-light)', fontSize: '1.8rem', margin: '4px 0' }}>
+          <h2 style={{ fontFamily: 'var(--font-serif)', color: 'var(--gold-light)', fontSize: '1.7rem', margin: '2px 0' }}>
             {activeTab === 'signin' ? 'Sign In to Account' : 'Join House of Nayu'}
           </h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
