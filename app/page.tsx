@@ -196,21 +196,29 @@ export default function StorefrontPage() {
         <div className={`store-grid-container ${filterActive ? 'filter-active' : ''}`}>
           {/* Left Expandable Sidebar */}
           <aside className={`sidebar-filters-panel ${filterActive ? '' : 'hidden'}`}>
-            <div className="sidebar-header">
-              <h2>FILTERS</h2>
-              <button className="icon-btn-sm" onClick={() => setFilterActive(false)}><X size={16} /></button>
+            <div className="sidebar-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '16px', borderBottom: '1px solid var(--border-gold)', marginBottom: '16px' }}>
+              <h2 style={{ fontFamily: 'var(--font-serif)', color: 'var(--gold-light)', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '0.08em', margin: 0 }}>
+                <SlidersHorizontal size={17} style={{ color: 'var(--gold-light)' }} /> FILTER COLLECTIONS
+              </h2>
+              <button
+                onClick={() => setFilterActive(false)}
+                style={{ background: 'rgba(212, 175, 55, 0.1)', border: '1px solid var(--border-gold)', color: 'var(--gold-light)', borderRadius: '50%', width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                title="Close Filters"
+              >
+                <X size={15} />
+              </button>
             </div>
 
             {/* Price Accordion */}
             <div className="filter-accordion open">
               <div className="accordion-header">
-                <span>PRICE</span>
+                <span>PRICE RANGE</span>
                 <ChevronUp size={16} />
               </div>
               <div className="accordion-body">
                 <div className="price-slider-wrap">
                   <div className="price-val-row">
-                    <span>Under: <strong style={{ color: 'var(--gold-light)' }}>₹{currentMaxPrice.toLocaleString('en-IN')}</strong></span>
+                    <span>Under: <strong style={{ color: 'var(--gold-light)', fontSize: '1.05rem' }}>₹{currentMaxPrice.toLocaleString('en-IN')}</strong></span>
                     <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Max: ₹10,000</span>
                   </div>
                   <div className="range-slider-container">
@@ -223,7 +231,7 @@ export default function StorefrontPage() {
             {/* Category Accordion */}
             <div className="filter-accordion open">
               <div className="accordion-header">
-                <span>CATEGORY & FABRIC</span>
+                <span>FABRIC & CATEGORY</span>
                 <ChevronUp size={16} />
               </div>
               <div className="accordion-body">
@@ -231,7 +239,9 @@ export default function StorefrontPage() {
                   {categoriesList.map(cat => (
                     <li key={cat} className={`filter-checkbox-item ${currentCategory === cat ? 'active' : ''}`} onClick={() => setCurrentCategory(cat)}>
                       <span className={`custom-checkbox ${currentCategory === cat ? 'checked' : ''}`}></span>
-                      <span className="checkbox-label">{cat === 'ALL' ? 'All Collections' : cat}</span>
+                      <span className="checkbox-label" style={{ letterSpacing: '0.05em' }}>
+                        {cat === 'ALL' ? 'ALL COLLECTIONS' : cat.toUpperCase()}
+                      </span>
                     </li>
                   ))}
                 </ul>
